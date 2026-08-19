@@ -48,7 +48,8 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .large-title{font-size:28px;font-weight:800;letter-spacing:.2px;padding:2px 20px 0}
 .sub-title{font-size:13px;color:var(--label2);margin-top:2px;min-height:17px;padding:0 20px}
 /* 同步状态芯片（右上）与登录芯片（标题行右侧） */
-.sync-chip{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(255,111,181,.12);color:var(--sky-deep);pointer-events:none;z-index:5}
+.sync-chip{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;display:flex;align-items:center;gap:5px;padding:4px 10px;border:none;border-radius:999px;font-size:11px;font-weight:600;background:rgba(255,111,181,.12);color:var(--sky-deep);z-index:5;cursor:pointer}
+.sync-chip:active{opacity:.7}
 .sync-chip .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 .sync-chip.busy .dot{animation:syncPulse 1s ease-in-out infinite}
 .sync-chip.err{background:rgba(255,59,48,.12);color:#FF3B30}
@@ -247,6 +248,23 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   opacity:0;transition:.25s;z-index:300;pointer-events:none;white-space:nowrap;
 }
 .toast.show{opacity:1;transform:translateX(-50%)}
+
+/* ===== 左滑删除 ===== */
+.row.sw-wr{display:block;padding:0;overflow:hidden}
+.sw-inner{display:flex;align-items:center;gap:12px;padding:12px 0;min-height:50px;width:100%;background:var(--card);position:relative;transition:transform .22s ease}
+.sw-actions{position:absolute;top:0;right:0;bottom:0;display:flex}
+.sw-btn{width:74px;height:100%;border:none;background:var(--red);color:#fff;font-size:14px;font-weight:600}
+
+/* ===== 吃什么转盘 ===== */
+.spin-ic{font-size:64px;line-height:1.25}
+.spin-name{font-size:24px;font-weight:800;margin-top:8px;min-height:30px}
+.spin-sub{font-size:13px;color:var(--label2);margin-top:6px;min-height:17px}
+.cook-btn{flex:none;border:none;background:var(--sky-tint);color:var(--sky-deep);font-size:12px;font-weight:700;padding:6px 10px;border-radius:10px}
+.cook-btn:active{opacity:.7}
+
+/* ===== 打包清单勾选 ===== */
+.pack-row{display:flex;align-items:center;gap:8px;font-size:14px;margin:2px 4px 14px}
+.pack-row input{width:18px;height:18px;accent-color:#FF6FB5}
 </style>
 </head>
 <body>
@@ -360,7 +378,10 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       </div>
       <div class="chips" id="pantryChips"></div>
     </div>
-    <div class="geo-region" style="margin-top:16px">推荐菜品 · 按食材匹配</div>
+    <div class="geo-region" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+      <span>推荐菜品 · 按食材匹配</span>
+      <button class="link-btn" id="spinBtn">🎡 吃什么</button>
+    </div>
     <div id="dishList"></div>
   </section>
   </main>
@@ -458,6 +479,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <div class="field"><label>开始日期</label><input id="trStart" type="date"></div>
     <div class="field"><label>结束日期</label><input id="trEnd" type="date"></div>
     <div class="field"><label>备注</label><textarea id="trNote" placeholder="交通、住宿、同行人…（选填）" maxlength="200"></textarea></div>
+    <label class="pack-row"><input type="checkbox" id="trPack" checked><span>生成常用打包清单（证件 / 充电器 / 洗漱…）</span></label>
     <button class="btn" id="trSave">保存</button>
   </div>
 </div>
@@ -537,6 +559,30 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
         <div class="acc-sub" style="margin-top:8px">配置方法：在 HTML 顶部 WB_CONFIG 填入 SUPABASE_URL 与 SUPABASE_ANON_KEY，详见 HYBRID_ARCH.md。</div>
       </div>
     </div>
+    <div class="sec-l" style="margin-top:18px"><span>数据备份</span></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn" id="bkExport" style="background:var(--ink);color:var(--label)">导出数据</button>
+      <button class="btn" id="bkImport">导入数据</button>
+    </div>
+    <input type="file" id="bkFile" accept=".json,application/json" style="display:none">
+    <div class="acc-sub" style="margin-top:8px;text-align:center">导出为 JSON 文件，换设备时导入即可恢复全部数据</div>
+  </div>
+</div>
+
+<!-- 吃什么转盘 -->
+<div class="sheet" id="sheet-spin">
+  <div class="handle"></div>
+  <div class="sheet-head">
+    <button class="cancel">取消</button>
+    <span class="title">今天吃什么</span>
+    <span style="width:44px"></span>
+  </div>
+  <div class="sheet-body" style="text-align:center;padding-top:10px">
+    <div class="spin-ic" id="spinIc">🍽️</div>
+    <div class="spin-name" id="spinName">点开始抽一道</div>
+    <div class="spin-sub" id="spinSub"></div>
+    <button class="btn" id="spinGo" style="margin-top:20px">开始抽 🎰</button>
+    <div style="height:10px"></div>
   </div>
 </div>
 
@@ -644,7 +690,7 @@ $('#recDone').onclick=closeSheets;
 $('#recFreq').addEventListener('click',e=>{const c=e.target.closest('.chip');if(c)onRecPick(recCtx,c.textContent)});
 $('#recRand').addEventListener('click',e=>{const c=e.target.closest('.chip');if(c)onRecPick(recCtx,c.textContent)});
 $('#recAdd').onclick=()=>{const v=$('#recInput').value.trim();if(!v){toast('请输入内容');return}onRecPick(recCtx,v)};
-$('#recInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('#recAdd').onclick()});
+$('#recInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)$('#recAdd').onclick()});
 function onRecPick(ctx,text){
   if(ctx==='tasks'){
     tasks.push({id:uid(),text,note:'',done:false,created:Date.now()});
@@ -652,6 +698,7 @@ function onRecPick(ctx,text){
   }else if(ctx==='travel'){
     closeSheets();
     $('#trDest').value=text;$('#trStart').value=todayStr();$('#trEnd').value=todayStr();$('#trNote').value='';
+    $('#trPack').checked=true;
     openSheet('sheet-travel');
   }else if(ctx==='sport'){
     closeSheets();
@@ -696,7 +743,13 @@ function renderSub(){
     const out=ledger.filter(r=>r.date.startsWith(m)&&r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
     el.textContent=`记账 · ${+m.slice(5)}月支出 ${fmtMoney(out)}`;
   }else if(curTab==='travel'){
-    el.textContent=`旅行 · 已点亮 ${visitedSet().size}/${PLACES.length} 地 · ${trips.filter(t=>tripStatus(t)!=='ended').length} 个计划`;
+    const up=trips.filter(t=>tripStatus(t)==='upcoming').sort((a,b)=>a.start<b.start?-1:1);
+    let cd='';
+    if(up.length){
+      const days=Math.round((dOnly(up[0].start)-dOnly(todayStr()))/864e5);
+      cd=' · '+(days<=0?'今天出发':days+' 天后出发');
+    }
+    el.textContent=`旅行 · 已点亮 ${visitedSet().size}/${PLACES.length} 地 · ${trips.filter(t=>tripStatus(t)!=='ended').length} 个计划${cd}`;
   }else if(curTab==='work'){
     el.textContent=`工作 · ${work.filter(w=>!w.done).length} 项进行中 · ${work.filter(w=>!w.done&&w.pri==='高').length} 项高优`;
   }else if(curTab==='menu'){
@@ -741,7 +794,7 @@ function addTaskCustom(){
   inp.value='';saveTasks();recUse('tasks',v);renderTasks();
 }
 $('#taskAddBtn').onclick=()=>openRec('tasks');
-$('#taskInput').addEventListener('keydown',e=>{if(e.key==='Enter')addTaskCustom()});
+$('#taskInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)addTaskCustom()});
 $('#taskList').addEventListener('click',e=>{
   const btn=e.target.closest('[data-act]');if(!btn)return;
   const id=btn.closest('[data-id]').dataset.id;
@@ -1015,19 +1068,21 @@ $('#tripList').addEventListener('click',e=>{
   }
 });
 $('#tripList').addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&e.target.classList.contains('todo-input')){
+  if(e.key==='Enter'&&!e.isComposing&&e.target.classList.contains('todo-input')){
     const card=e.target.closest('.trip-card');
     const t=trips.find(x=>x.id===card.dataset.id);
     if(t)addTripTodo(t,e.target);
   }
 });
 $('#fabTrip').onclick=()=>openRec('travel');
+const PACK_TPL=['证件 / 护照','车票 / 机票确认单','充电器 & 充电宝','洗漱用品','换洗衣物','常用药品','行李收纳'];
 $('#trSave').onclick=()=>{
   const dest=$('#trDest').value.trim();
   if(!dest){toast('请输入目的地');return}
   let s=$('#trStart').value||todayStr(),e2=$('#trEnd').value||s;
   if(e2<s)e2=s;
-  trips.push({id:uid(),dest,start:s,end:e2,note:$('#trNote').value.trim(),todos:[],created:Date.now()});
+  const todos=$('#trPack').checked?PACK_TPL.map(t=>({id:uid(),text:t,done:false})):[];
+  trips.push({id:uid(),dest,start:s,end:e2,note:$('#trNote').value.trim(),todos,created:Date.now()});
   saveTrips();recUse('travel',dest);closeSheets();renderTravel();toast('计划已创建');
 };
 
@@ -1203,24 +1258,133 @@ function renderMenu(){
         <div class="led-note">${d.miss.length?'还缺 '+d.miss.join('、'):`食材齐全 · ${d.need.length} 样`}</div>
       </div>
       <span class="wk-badge ${d.miss.length?'miss':'ok'}">${d.miss.length?'再买 '+d.miss.length+' 样':'现在可做'}</span>
+      <button class="cook-btn" data-act="cook" data-n="${esc(d.name)}">做完</button>
     </div></div>`).join('')
     :(pantry.length?'<div class="empty"><div class="big">🍽️</div>当前食材暂无匹配菜品，再加几样试试</div>':'');
   if(curTab==='menu')renderSub();
 }
 $('#pantryAddBtn').onclick=()=>openRec('menu');
 $('#pantryInput').addEventListener('keydown',e=>{
-  if(e.key==='Enter'){addPantry($('#pantryInput').value);$('#pantryInput').value=''}
+  if(e.key==='Enter'&&!e.isComposing){addPantry($('#pantryInput').value);$('#pantryInput').value=''}
 });
 $('#pantryChips').addEventListener('click',e=>{
   const c=e.target.closest('.chip');if(!c)return;
   pantry=pantry.filter(x=>x!==c.dataset.p);savePantry();renderMenu();
 });
+/* 做完一道菜 → 一键扣掉用掉的食材 */
+$('#dishList').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act="cook"]');if(!b)return;
+  const r=RECIPES.find(x=>x[0]===b.dataset.n);if(!r)return;
+  const used=r[2].filter(x=>pantry.includes(x));
+  if(!used.length){toast('库存里没有这道菜的食材');return}
+  pantry=pantry.filter(x=>!r[2].includes(x));savePantry();renderMenu();
+  toast(`${r[1]} ${r[0]} 开吃 · 已扣 ${used.length} 样食材`);
+});
+/* 吃什么转盘：优先抽「现在可做」，没有就抽全部菜谱 */
+let spinTimer=null,spinning=false;
+$('#spinBtn').onclick=()=>{
+  spinning=false;clearTimeout(spinTimer);
+  $('#spinGo').textContent='开始抽 🎰';
+  $('#spinIc').textContent='🍽️';$('#spinName').textContent='点开始抽一道';
+  $('#spinSub').textContent=pantry.length?'优先抽现在就能做的菜':'先加食材，就能优先抽到现成的菜';
+  openSheet('sheet-spin');
+};
+$('#spinGo').onclick=()=>{
+  if(spinning)return;
+  const can=pantry.length?dishCalc().filter(d=>!d.miss.length):[];
+  const pool=can.length?can:RECIPES.map(([name,ic,need])=>({name,ic,need,miss:need.filter(x=>!pantry.includes(x))}));
+  if(!pool.length){toast('菜谱空空，先加食材试试');return}
+  spinning=true;
+  const btn=$('#spinGo');btn.textContent='抽菜中…';
+  const target=pool[Math.floor(Math.random()*pool.length)];
+  const total=14+Math.floor(Math.random()*8);
+  let step=0,delay=55;
+  clearTimeout(spinTimer);
+  const tick=()=>{
+    const fin=step>=total;
+    const cur=fin?target:pool[Math.floor(Math.random()*pool.length)];
+    $('#spinIc').textContent=cur.ic;
+    $('#spinName').textContent=cur.name;
+    $('#spinSub').textContent=cur.miss.length?'还缺 '+cur.miss.join('、'):'食材齐全，就它了！';
+    step++;
+    if(fin){spinning=false;btn.textContent='再抽一次 🎰';return}
+    delay*=1.14;
+    spinTimer=setTimeout(tick,delay);
+  };
+  tick();
+};
 
 /* ================= Sheet 通用 ================= */
 function openSheet(id){$('#sheetMask').classList.add('show');$('#'+id).classList.add('show')}
 function closeSheets(){$('#sheetMask').classList.remove('show');$$('.sheet').forEach(s=>s.classList.remove('show'))}
 $('#sheetMask').onclick=closeSheets;
 $$('.sheet .cancel').forEach(b=>b.onclick=closeSheets);
+
+/* ================= 左滑删除手势（任务 / 记账 / 运动 / 工作列表） =================
+   横滑超过阈值露出红色「删除」，点击即走该列表原有的删除逻辑；
+   点按其他位置先收起当前打开的行，保持 iOS 列表手感。 */
+function enableSwipeDel(sel){
+  const list=$(sel);if(!list)return;
+  let row=null,lx=0,ly=0,dx=0,lock='',openRow=null;
+  const inn=r=>r.querySelector(':scope > .sw-inner');
+  const closeOpen=()=>{
+    if(!openRow)return;
+    const i=inn(openRow);if(i)i.style.transform='';
+    openRow=null;
+  };
+  const arm=r=>{
+    if(inn(r))return;
+    const i=document.createElement('div');i.className='sw-inner';
+    while(r.firstChild)i.appendChild(r.firstChild);
+    const a=document.createElement('div');a.className='sw-actions';
+    const b=document.createElement('button');b.type='button';b.className='sw-btn';b.textContent='删除';
+    b.addEventListener('click',()=>{
+      closeOpen();
+      const del=r.querySelector('[data-act="del"]');
+      if(del)del.click();
+    });
+    a.appendChild(b);
+    r.classList.add('sw-wr');r.appendChild(a);r.appendChild(i);
+  };
+  list.addEventListener('touchstart',e=>{
+    const r=e.target.closest('.row[data-id]');
+    if(openRow&&openRow!==r)closeOpen();
+    row=r;lock='';
+    if(!r)return;
+    lx=e.touches[0].clientX;ly=e.touches[0].clientY;
+    dx=(openRow===r)?-74:0;
+  },{passive:true});
+  list.addEventListener('touchmove',e=>{
+    if(!row)return;
+    const t=e.touches[0];
+    if(!lock){
+      const mx=t.clientX-lx,my=t.clientY-ly;
+      if(Math.abs(mx)<10&&Math.abs(my)<10)return;
+      lock=Math.abs(mx)>Math.abs(my)*1.2?'h':'v';
+    }
+    if(lock!=='h')return;
+    if(!inn(row))arm(row);
+    const i=inn(row);i.style.transition='none';
+    dx+=t.clientX-lx;lx=t.clientX;
+    dx=Math.max(-110,Math.min(0,dx));
+    i.style.transform='translateX('+dx+'px)';
+    e.preventDefault();
+  },{passive:false});
+  const end=()=>{
+    if(row&&lock==='h'&&inn(row)){
+      const i=inn(row);i.style.transition='';
+      if(dx<-40){i.style.transform='translateX(-74px)';openRow=row}
+      else{i.style.transform='';if(openRow===row)openRow=null}
+    }
+    row=null;lock='';
+  };
+  list.addEventListener('touchend',end);
+  list.addEventListener('touchcancel',end);
+  list.addEventListener('click',e=>{
+    if(openRow&&!openRow.contains(e.target)){closeOpen();e.stopPropagation();e.preventDefault()}
+  },true);
+}
+['#taskList','#doneList','#ledgerList','#sportList','#workList'].forEach(enableSwipeDel);
 
 /* ================= 混合存储层（本地缓存 + Supabase 主同步 + iCloud 辅助） =================
    三层架构（同步优先级：本地优先 → Supabase 主同步 → iCloud 辅助）：
@@ -1576,6 +1740,61 @@ $('#accSignOut').onclick=async()=>{
   try{await SbBackend.signOut()}catch(e){}
   closeSheets();toast('已退出登录 · 数据仍保留在本地');
 };
+
+/* ================= 交互细节（同步芯片手动同步 + 下拉刷新同步） ================= */
+$('#syncChip').onclick=()=>{
+  if(!Sync.anyBackend()){toast('本地模式 · 数据保存在本机');return}
+  if(!navigator.onLine){toast('当前离线 · 使用本地缓存');return}
+  if(!Sync.canSync()){toast('登录后即可云端同步');return}
+  toast('正在同步…');Sync.pullAll();
+};
+let pdY=0,pdOn=false,pdDone=false;
+window.addEventListener('touchstart',e=>{
+  if(window.scrollY<=2){pdY=e.touches[0].clientY;pdOn=true;pdDone=false}else pdOn=false;
+},{passive:true});
+window.addEventListener('touchmove',e=>{
+  if(!pdOn||pdDone)return;
+  if(e.touches[0].clientY-pdY>70&&window.scrollY<=2){
+    pdDone=true;
+    if(Sync.canSync()){toast('下拉同步…');Sync.pullAll()}
+    else if(navigator.onLine&&!Sync.anyBackend())toast('本地模式 · 无需同步');
+    else if(!navigator.onLine)toast('当前离线 · 使用本地缓存');
+  }
+},{passive:true});
+window.addEventListener('touchend',()=>{pdOn=false},{passive:true});
+
+/* ================= 数据备份（JSON 导出 / 导入） ================= */
+$('#bkExport').onclick=()=>{
+  const data={app:'Yichi工作台',ver:1,exported:new Date().toISOString(),
+    tasks,ledger,trips,sports,work,pantry,geoMan,rec:recData};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Yichi工作台-备份-'+todayStr()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('备份文件已导出');
+};
+$('#bkImport').onclick=()=>$('#bkFile').click();
+$('#bkFile').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];
+  e.target.value='';
+  if(!f)return;
+  let d=null;
+  try{d=JSON.parse(await f.text())}catch(err){toast('文件格式不对，不是有效 JSON');return}
+  if(!d||typeof d!=='object'||d.app!=='Yichi工作台'){toast('这不是有效的工作台备份文件');return}
+  if(!confirm('导入会用备份内容替换当前数据（随后自动同步到云端）。继续吗？'))return;
+  if(Array.isArray(d.tasks)){tasks=d.tasks;saveTasks()}
+  if(Array.isArray(d.ledger)){ledger=d.ledger;saveLedger()}
+  if(Array.isArray(d.trips)){trips=d.trips;saveTrips()}
+  if(Array.isArray(d.sports)){sports=d.sports;saveSports()}
+  if(Array.isArray(d.work)){work=d.work;saveWork()}
+  if(Array.isArray(d.pantry)){pantry=d.pantry;savePantry()}
+  if(Array.isArray(d.geoMan)){geoMan=d.geoMan;saveGeo()}
+  if(d.rec&&typeof d.rec==='object'){recData=d.rec;saveRec()}
+  renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderSub();
+  closeSheets();toast('导入完成 · 数据已恢复');
+});
 
 /* ================= 初始化 ================= */
 $$('.mod').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
