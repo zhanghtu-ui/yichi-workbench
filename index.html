@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=4">
+<link rel="manifest" href="manifest.json?v=5">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -265,6 +265,43 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 /* ===== 打包清单勾选 ===== */
 .pack-row{display:flex;align-items:center;gap:8px;font-size:14px;margin:2px 4px 14px}
 .pack-row input{width:18px;height:18px;accent-color:#FF6FB5}
+
+/* ===== Toast 操作按钮（撤销） ===== */
+.toast.has-act{pointer-events:auto;display:flex;align-items:center;gap:12px;white-space:nowrap}
+.toast-act{border:none;background:linear-gradient(135deg,var(--sky),var(--sky-deep));color:#fff;font-size:13px;font-weight:700;padding:5px 14px;border-radius:14px;flex:none}
+.toast-act:active{opacity:.75}
+
+/* ===== 今日首页卡 ===== */
+.td-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:15px;font-weight:700;padding:2px 0 4px}
+.td-fire{font-size:12px;font-weight:700;color:var(--orange);white-space:nowrap}
+.td-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:.5px solid var(--sep);font-size:14px;cursor:pointer}
+.td-row:active{opacity:.55}
+.td-ic{width:22px;text-align:center;flex:none}
+.td-tx{font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-val{color:var(--label2);font-size:13px;font-weight:600;flex:none}
+
+/* ===== 记账：月份切换 / 预算 / 分类筛选 ===== */
+.month-nav{display:flex;justify-content:center;align-items:center;gap:16px;margin:2px 0 10px}
+.m-arr{width:30px;height:30px;border-radius:50%;border:none;background:var(--card);color:var(--label2);font-size:18px;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.m-arr:active{opacity:.6}
+.m-arr[disabled]{opacity:.3}
+.m-label{font-size:15px;font-weight:700;min-width:104px;text-align:center}
+.budget-line{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--label2);margin:-4px 2px 12px;padding:0 4px}
+.budget-line.over{color:var(--red);font-weight:600}
+.budget-line .link-btn{margin-left:auto;flex:none}
+.budget-track{flex:1;max-width:120px;height:6px;border-radius:3px;background:var(--ink);overflow:hidden}
+.budget-track i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--sky),var(--sky-deep))}
+.budget-line.over .budget-track i{background:linear-gradient(90deg,#FF7A6E,var(--red))}
+
+/* ===== 运动热图 ===== */
+.hm-wrap{display:flex;gap:3px;overflow-x:auto;padding:6px 0 2px}
+.hm-col{display:flex;flex-direction:column;gap:3px;flex:none}
+.hm{width:13px;height:13px;border-radius:3.5px;background:var(--ink)}
+.hm.lv1{background:rgba(255,111,181,.35)}
+.hm.lv2{background:rgba(255,111,181,.7)}
+.hm.lv3{background:linear-gradient(135deg,var(--sky),var(--sky-deep))}
+.hm.f{opacity:.22}
+.hm-cap{font-size:11px;color:var(--label2);margin-top:8px}
 </style>
 </head>
 <body>
@@ -290,6 +327,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <main class="pages">
   <!-- ========== 每日任务 ========== -->
   <section class="page active" id="page-tasks">
+    <div class="card pad" id="todayCard" style="margin-top:2px"></div>
     <div class="input-bar">
       <input id="taskInput" type="text" placeholder="添加新任务…" autocomplete="off" maxlength="60">
       <button class="add-round" id="taskAddBtn" aria-label="推荐添加任务">
@@ -308,11 +346,17 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 
   <!-- ========== 记账 ========== -->
   <section class="page" id="page-ledger">
-    <div class="card sum-card">
-      <div class="sum"><span class="sum-l">本月支出</span><span class="sum-v out" id="sumOut">€0.00</span></div>
-      <div class="sum"><span class="sum-l">本月收入</span><span class="sum-v in" id="sumIn">€0.00</span></div>
-      <div class="sum"><span class="sum-l">本月结余</span><span class="sum-v bal" id="sumBal">€0.00</span></div>
+    <div class="month-nav">
+      <button class="m-arr" id="mPrev" aria-label="上个月">‹</button>
+      <span class="m-label" id="mLabel"></span>
+      <button class="m-arr" id="mNext" aria-label="下个月">›</button>
     </div>
+    <div class="card sum-card">
+      <div class="sum"><span class="sum-l" id="sumOutL">本月支出</span><span class="sum-v out" id="sumOut">€0.00</span></div>
+      <div class="sum"><span class="sum-l" id="sumInL">本月收入</span><span class="sum-v in" id="sumIn">€0.00</span></div>
+      <div class="sum"><span class="sum-l" id="sumBalL">本月结余</span><span class="sum-v bal" id="sumBal">€0.00</span></div>
+    </div>
+    <div class="budget-line" id="budgetLine"></div>
     <div class="card pad">
       <div class="segment" id="boardSeg" style="margin-bottom:14px">
         <button data-b="month" class="on">月度看板</button>
@@ -322,6 +366,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
         <div class="ratio-bar" id="ratioBar"></div>
         <div class="ratio-cap" id="ratioCap"></div>
         <div id="catBars"></div>
+        <div id="monthReport"></div>
       </div>
       <div id="boardYear" style="display:none">
         <div class="year-chart" id="yearChart"></div>
@@ -334,6 +379,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <button data-f="expense">支出</button>
       <button data-f="income">收入</button>
     </div>
+    <div class="chips" id="ledCatFilter" style="margin:10px 2px 12px"></div>
     <div id="ledgerList"></div>
   </section>
 
@@ -352,6 +398,11 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <div class="sum"><span class="sum-l">本周次数</span><span class="sum-v bal" id="spWeek">0</span></div>
       <div class="sum"><span class="sum-l">本月次数</span><span class="sum-v bal" id="spMonth">0</span></div>
       <div class="sum"><span class="sum-l">本月时长</span><span class="sum-v bal" id="spDur">0 分钟</span></div>
+    </div>
+    <div class="card pad">
+      <div class="geo-top"><span class="geo-title">🔥 打卡热图</span><span class="geo-stats" id="spStreak"></span></div>
+      <div class="hm-wrap" id="spHeat"></div>
+      <div class="hm-cap">近 12 周 · 周一在上 · 颜色越深练得越久</div>
     </div>
     <div class="card" id="sportCard"><div id="sportList"></div></div>
   </section>
@@ -448,7 +499,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <div class="handle"></div>
   <div class="sheet-head">
     <button class="cancel">取消</button>
-    <span class="title">记一笔</span>
+    <span class="title" id="ledTitle">记一笔</span>
     <span style="width:44px"></span>
   </div>
   <div class="sheet-body">
@@ -460,7 +511,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <input id="ledAmount" class="amount-input" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0.00">
     </div>
     <div class="field"><label>类别</label><div class="chips" id="ledCats"></div></div>
-    <div class="field"><label>日期</label><input id="ledDate" type="date"></div>
+    <div class="field"><label>日期</label><input id="ledDate" type="date"><div class="chips" id="ledDateQuick" style="margin-top:8px"></div></div>
     <div class="field"><label>备注</label><input id="ledNote" type="text" placeholder="选填" maxlength="40"></div>
     <button class="btn" id="ledSave">保存</button>
   </div>
@@ -489,7 +540,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <div class="handle"></div>
   <div class="sheet-head">
     <button class="cancel">取消</button>
-    <span class="title">记录运动</span>
+    <span class="title" id="spTitle">记录运动</span>
     <span style="width:44px"></span>
   </div>
   <div class="sheet-body">
@@ -497,7 +548,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <div class="field" id="spCustomWrap" style="display:none"><label>自定义类型</label><input id="spCustom" type="text" placeholder="例如：跳绳" maxlength="12"></div>
     <div class="field"><label>时长（分钟）</label><input id="spMin" type="number" inputmode="numeric" min="0" placeholder="例如：30"></div>
     <div class="field"><label>次数 / 组数 / 距离</label><input id="spQty" type="text" placeholder="例如：3 组 × 12 或 5 公里（选填）" maxlength="30"></div>
-    <div class="field"><label>日期</label><input id="spDate" type="date"></div>
+    <div class="field"><label>日期</label><input id="spDate" type="date"><div class="chips" id="spDateQuick" style="margin-top:8px"></div></div>
     <button class="btn" id="spSave">保存</button>
   </div>
 </div>
@@ -507,7 +558,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <div class="handle"></div>
   <div class="sheet-head">
     <button class="cancel">取消</button>
-    <span class="title">添加工作</span>
+    <span class="title" id="wkSheetTitle">添加工作</span>
     <span style="width:44px"></span>
   </div>
   <div class="sheet-body">
@@ -642,6 +693,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const pad=n=>String(n).padStart(2,'0');
 const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const dateKey=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const WEEK=['周日','周一','周二','周三','周四','周五','周六'];
 const dOnly=s=>{const p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])};
 const cnDate=s=>{const p=s.split('-').map(Number);return p[1]+'月'+p[2]+'日'};
@@ -652,7 +704,12 @@ const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 const PEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4.3-.9L19.5 7.9a2.05 2.05 0 00-2.9-2.9L5.4 16.2 4 20z"/><path d="M13.8 6.8l2.9 2.9"/></svg>';
 const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
 let toastTimer=null;
-function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),1600)}
+function toast(msg,act){const t=$('#toast');
+  t.innerHTML=esc(msg)+(act?'<button class="toast-act" id="toastAct">'+esc(act.label)+'</button>':'');
+  t.classList.toggle('has-act',!!act);t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),act?4000:1600);
+  const b=$('#toastAct');if(b)b.onclick=()=>{t.classList.remove('show');clearTimeout(toastTimer);act.fn()};
+}
 
 /* ================= 统一推荐系统 =================
    结构：REC_POOLS 内置候选；recData 记录频次 f 与历史 h。
@@ -703,6 +760,7 @@ function onRecPick(ctx,text){
     openSheet('sheet-travel');
   }else if(ctx==='sport'){
     closeSheets();
+    editingSpId=null;$('#spTitle').textContent='记录运动';
     const m=text.match(/(\d+)\s*分钟/);
     const type=m?text.replace(/\s*\d+\s*分钟/,'').trim()||text:text;
     $$('#spCats .chip').forEach(x=>x.classList.remove('on'));
@@ -713,6 +771,7 @@ function onRecPick(ctx,text){
     openSheet('sheet-sport');
   }else if(ctx==='work'){
     closeSheets();
+    editingWkId=null;$('#wkSheetTitle').textContent='添加工作';
     $('#wkTitle').value=text;$('#wkNote').value='';
     openSheet('sheet-work');
   }else if(ctx==='menu'){
@@ -759,7 +818,38 @@ function renderSub(){
     const m=todayStr().slice(0,7);
     el.textContent=`运动 · 本月 ${sports.filter(r=>r.date.startsWith(m)).length} 次`;
   }
+  renderToday();
 }
+
+/* ================= 今日首页卡 ================= */
+function taskStreak(){
+  return dayStreak(new Set(tasks.filter(t=>t.done&&t.doneAt).map(t=>dateKey(new Date(t.doneAt)))));
+}
+function renderToday(){
+  const el=$('#todayCard');if(!el)return;
+  const d=new Date(),today=todayStr();
+  const rows=[];
+  const act=tasks.filter(t=>!t.done);
+  rows.push({tab:'tasks',ic:'✅',tx:'待办任务',val:act.length?act.length+' 项待办':'全部完成 🎉'});
+  const out=ledger.filter(r=>r.date===today&&r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
+  rows.push({tab:'ledger',ic:'💶',tx:'今日支出',val:out?fmtMoney(out):'还没花钱'});
+  const sp=sports.filter(r=>r.date===today);
+  rows.push({tab:'sport',ic:'🏃',tx:'今日运动',val:sp.length?sp.length+' 次 · '+sp.reduce((a,b)=>a+(+b.dur||0),0)+' 分钟':'还没动'});
+  const up=trips.filter(t=>tripStatus(t)==='upcoming').sort((a,b)=>a.start<b.start?-1:1);
+  if(up.length){
+    const days=Math.round((dOnly(up[0].start)-dOnly(today))/864e5);
+    rows.push({tab:'travel',ic:'✈️',tx:'下一站 '+up[0].dest,val:days<=0?'今天出发':days+' 天后'});
+  }
+  const can=dishCalc().filter(x=>!x.miss.length);
+  rows.push({tab:'menu',ic:'🍳',tx:'现在可做',val:can.length+' 道菜'});
+  const fire=taskStreak();
+  el.innerHTML='<div class="td-head"><span>今天 · '+(d.getMonth()+1)+'月'+d.getDate()+'日 '+WEEK[d.getDay()]+'</span>'
+    +'<span class="td-fire">'+(fire>0?(fire>=7?'🔥 ':'')+'任务连续 '+fire+' 天':'任务今天还没打卡')+'</span></div>'
+    +rows.map(r=>'<div class="td-row" data-tab="'+r.tab+'"><span class="td-ic">'+r.ic+'</span><span class="td-tx">'+esc(r.tx)+'</span><span class="td-val">'+esc(r.val)+'</span></div>').join('');
+}
+$('#todayCard').addEventListener('click',e=>{
+  const r=e.target.closest('.td-row');if(r&&r.dataset.tab)switchTab(r.dataset.tab);
+});
 
 /* ================= 任务模块 ================= */
 let doneOpen=false,editingId=null;
@@ -801,7 +891,11 @@ $('#taskList').addEventListener('click',e=>{
   const id=btn.closest('[data-id]').dataset.id;
   const a=btn.dataset.act;
   if(a==='toggle'){const t=tasks.find(x=>x.id===id);if(t){t.done=true;t.doneAt=Date.now();saveTasks();renderTasks();toast('已完成 ✓')}}
-  else if(a==='del'){tasks=tasks.filter(x=>x.id!==id);saveTasks();renderTasks()}
+  else if(a==='del'){
+    const i=tasks.findIndex(x=>x.id===id);if(i<0)return;const it=tasks[i];tasks.splice(i,1);
+    saveTasks();renderTasks();
+    toast('已删除任务',{label:'撤销',fn:()=>{tasks.splice(Math.min(i,tasks.length),0,it);saveTasks();renderTasks()}});
+  }
   else if(a==='edit'){
     const t=tasks.find(x=>x.id===id);if(!t)return;
     editingId=id;$('#etText').value=t.text;$('#etNote').value=t.note||'';
@@ -819,7 +913,11 @@ $('#doneList').addEventListener('click',e=>{
   const btn=e.target.closest('[data-act]');if(!btn)return;
   const id=btn.closest('[data-id]').dataset.id;
   if(btn.dataset.act==='undo'){const t=tasks.find(x=>x.id===id);if(t){t.done=false;saveTasks();renderTasks()}}
-  else if(btn.dataset.act==='del'){tasks=tasks.filter(x=>x.id!==id);saveTasks();renderTasks()}
+  else if(btn.dataset.act==='del'){
+    const i=tasks.findIndex(x=>x.id===id);if(i<0)return;const it=tasks[i];tasks.splice(i,1);
+    saveTasks();renderTasks();
+    toast('已删除任务',{label:'撤销',fn:()=>{tasks.splice(Math.min(i,tasks.length),0,it);saveTasks();renderTasks()}});
+  }
 });
 
 /* ================= 记账模块 ================= */
@@ -829,18 +927,28 @@ const CATS={
 };
 const catIcon=(type,name)=>{const f=(CATS[type]||[]).find(c=>c[0]===name);return f?f[1]:(type==='income'?'💶':'📦')};
 let ledgerFilter='all',ledgerType='expense',ledgerCat='餐饮',boardView='month';
+let ledMonth=todayStr().slice(0,7),ledCatFilter='all',editingLedId=null;
 
+const monthLabel=mk=>mk.slice(0,4)+' 年 '+(+mk.slice(5))+' 月';
 function renderLedger(){
-  const m=todayStr().slice(0,7);
+  const m=ledMonth,cur=todayStr().slice(0,7);
+  $('#mLabel').textContent=monthLabel(m);
+  $('#mNext').disabled=m>=cur;
+  const mm=+m.slice(5);
+  $('#sumOutL').textContent=mm+'月支出';
+  $('#sumInL').textContent=mm+'月收入';
+  $('#sumBalL').textContent=mm+'月结余';
   const ms=ledger.filter(r=>r.date.startsWith(m));
   const out=ms.filter(r=>r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
   const inc=ms.filter(r=>r.type==='income').reduce((a,b)=>a+ +b.amount,0);
   $('#sumOut').textContent=fmtMoney(out);
   $('#sumIn').textContent=fmtMoney(inc);
   $('#sumBal').textContent=fmtMoney(inc-out);
+  renderBudget(out);
+  buildLedCatFilter();
   renderBoards();
   const rows=ledger
-    .filter(r=>ledgerFilter==='all'||r.type===ledgerFilter)
+    .filter(r=>r.date.startsWith(m)&&(ledgerFilter==='all'||r.type===ledgerFilter)&&(ledCatFilter==='all'||r.cat===ledCatFilter))
     .sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:b.created-a.created);
   if(!rows.length){
     $('#ledgerList').innerHTML='<div class="empty"><div class="big">💶</div>还没有记录，点右下角 ＋ 记一笔</div>';
@@ -873,7 +981,7 @@ function renderLedger(){
   if(curTab==='ledger')renderSub();
 }
 function renderBoards(){
-  const m=todayStr().slice(0,7);
+  const m=ledMonth;
   const ms=ledger.filter(r=>r.date.startsWith(m));
   const out=ms.filter(r=>r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
   const inc=ms.filter(r=>r.type==='income').reduce((a,b)=>a+ +b.amount,0);
@@ -884,7 +992,7 @@ function renderBoards(){
     $('#ratioCap').textContent=`支出 ${po}% · 收入 ${100-po}%`;
   }else{
     $('#ratioBar').innerHTML='<i class="i" style="width:100%;background:#EDF2F7"></i>';
-    $('#ratioCap').textContent='本月暂无记录';
+    $('#ratioCap').textContent='该月暂无记录';
   }
   const byCat={};
   ms.filter(r=>r.type==='expense').forEach(r=>byCat[r.cat]=(byCat[r.cat]||0)+ +r.amount);
@@ -894,7 +1002,25 @@ function renderBoards(){
     return `<div class="cat-row"><span class="cat-name">${catIcon('expense',name)} ${esc(name)}</span>
       <div class="cat-track"><i style="width:${pct}%"></i></div>
       <span class="cat-pct">${pct}%</span></div>`;
-  }).join(''):'<div class="ratio-cap" style="margin:4px 0">本月暂无支出分类</div>';
+  }).join(''):'<div class="ratio-cap" style="margin:4px 0">该月暂无支出分类</div>';
+  /* 月度小报 */
+  const rep=$('#monthReport');
+  if(rep){
+    if(!ms.length||out<=0){rep.innerHTML=''}
+    else{
+      const ym=+m.slice(0,4),mo=+m.slice(5);
+      const dim=new Date(ym,mo,0).getDate();
+      const elapsed=m===todayStr().slice(0,7)?new Date().getDate():dim;
+      const avg=out/Math.max(1,elapsed);
+      const top=entries.length?entries[0]:null;
+      const pmKey=mo===1?(ym-1)+'-'+pad(12):ym+'-'+pad(mo-1);
+      const pOut=ledger.filter(r=>r.date.startsWith(pmKey)&&r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
+      const parts=['日均支出 '+fmtMoney(avg)];
+      if(top)parts.push('花得最多：'+top[0]+' '+fmtMoney(top[1]));
+      if(pOut>0){const d=Math.round((out-pOut)/pOut*100);parts.push(d>=0?'比上月多 '+d+'%':'比上月省 '+(-d)+'%')}
+      rep.innerHTML='<div class="ratio-cap" style="margin-top:12px">📮 月度小报 · '+parts.map(esc).join(' · ')+'</div>';
+    }
+  }
   /* 年度看板 */
   const y=new Date().getFullYear();
   const months=[];let yOut=0,yIn=0,max=1;
@@ -922,14 +1048,84 @@ $('#boardSeg').addEventListener('click',e=>{
 });
 $('#ledFilter').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  ledgerFilter=b.dataset.f;
+  ledgerFilter=b.dataset.f;ledCatFilter='all';
   $$('#ledFilter button').forEach(x=>x.classList.toggle('on',x===b));
   renderLedger();
 });
 $('#ledgerList').addEventListener('click',e=>{
-  const btn=e.target.closest('[data-act="del"]');if(!btn)return;
-  const id=btn.closest('[data-id]').dataset.id;
-  ledger=ledger.filter(x=>x.id!==id);saveLedger();renderLedger();
+  const row=e.target.closest('.row');if(!row)return;
+  const id=row.dataset.id;
+  const btn=e.target.closest('[data-act="del"]');
+  if(btn){
+    const i=ledger.findIndex(x=>x.id===id);if(i<0)return;const it=ledger[i];ledger.splice(i,1);
+    saveLedger();renderLedger();
+    toast('已删除记录',{label:'撤销',fn:()=>{ledger.splice(Math.min(i,ledger.length),0,it);saveLedger();renderLedger()}});
+    return;
+  }
+  /* 点行其余区域 → 编辑该记录 */
+  const r=ledger.find(x=>x.id===id);if(!r)return;
+  editingLedId=r.id;
+  ledgerType=r.type;
+  $$('#ledTypeSeg button').forEach(x=>x.classList.toggle('on',x.dataset.t===r.type));
+  buildLedCats();
+  $$('#ledCats .chip').forEach(x=>x.classList.toggle('on',x.dataset.v===r.cat));
+  ledgerCat=r.cat;
+  $('#ledAmount').value=String(r.amount).replace('.',',');
+  $('#ledDate').value=r.date;
+  $('#ledNote').value=r.note||'';
+  $('#ledTitle').textContent='编辑记录';
+  openSheet('sheet-ledger');
+});
+/* 月份切换 */
+$('#mPrev').onclick=()=>{
+  const y=+ledMonth.slice(0,4),mo=+ledMonth.slice(5);
+  ledMonth=mo===1?(y-1)+'-'+pad(12):y+'-'+pad(mo-1);
+  renderLedger();
+};
+$('#mNext').onclick=()=>{
+  const y=+ledMonth.slice(0,4),mo=+ledMonth.slice(5);
+  const nk=mo===12?(y+1)+'-'+pad(1):y+'-'+pad(mo+1);
+  if(nk>todayStr().slice(0,7))return;
+  ledMonth=nk;renderLedger();
+};
+/* 分类筛选 */
+function buildLedCatFilter(){
+  let names;
+  if(ledgerFilter==='all'){
+    const seen=new Set();names=[];
+    CATS.expense.concat(CATS.income).forEach(c=>{if(!seen.has(c[0])){seen.add(c[0]);names.push(c)}});
+  }else names=CATS[ledgerFilter];
+  $('#ledCatFilter').innerHTML='<button class="chip'+(ledCatFilter==='all'?' on':'')+'" data-c="all">全部</button>'
+    +names.map(c=>'<button class="chip'+(ledCatFilter===c[0]?' on':'')+'" data-c="'+esc(c[0])+'">'+c[1]+' '+esc(c[0])+'</button>').join('');
+}
+$('#ledCatFilter').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  ledCatFilter=c.dataset.c;renderLedger();
+});
+/* 每月预算 */
+function renderBudget(out){
+  const b=+store.get('wb.budget',0)||0;
+  const el=$('#budgetLine');
+  if(!b){
+    el.classList.remove('over');
+    el.innerHTML='<span>🎯 设置每月支出预算，花多少心里有数</span><button class="link-btn" id="budgetEdit">设预算</button>';
+    return;
+  }
+  const pct=Math.round(out/b*100),left=b-out;
+  el.classList.toggle('over',out>b);
+  el.innerHTML='<span>'+ (+ledMonth.slice(5)) +'月预算 '+fmtMoney(b)+(left>=0?' · 剩余 '+fmtMoney(left):' · 超支 '+fmtMoney(-left))+'</span>'
+    +'<div class="budget-track"><i style="width:'+Math.min(100,pct)+'%"></i></div>'
+    +'<button class="link-btn" id="budgetEdit">改</button>';
+}
+$('#budgetLine').addEventListener('click',e=>{
+  if(!e.target.closest('#budgetEdit'))return;
+  const cur=+store.get('wb.budget',0)||0;
+  const v=prompt('每月支出预算（€），填 0 清除预算：',cur?String(cur).replace('.',','):'');
+  if(v===null)return;
+  const n=parseFloat(v.replace(/,/g,'.'));
+  if(isNaN(n)||n<0){toast('请输入有效金额');return}
+  store.set('wb.budget',+n.toFixed(2));
+  renderLedger();
 });
 function buildLedCats(){
   ledgerCat=CATS[ledgerType][0][0];
@@ -947,9 +1143,25 @@ $('#ledCats').addEventListener('click',e=>{
   ledgerCat=c.dataset.v;
 });
 $('#fabLedger').onclick=()=>{
+  editingLedId=null;
+  $('#ledTitle').textContent='记一笔';
   $('#ledAmount').value='';$('#ledNote').value='';$('#ledDate').value=todayStr();
   openSheet('sheet-ledger');
 };
+/* 日期快捷：今天 / 昨天 / 前天 */
+function dateQuick(wrapSel,inputSel){
+  const wrap=$(wrapSel);if(!wrap)return;
+  wrap.innerHTML=['今天','昨天','前天'].map((t,i)=>{
+    const d=new Date();d.setDate(d.getDate()-i);
+    return '<button class="chip" data-q="'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'">'+t+'</button>';
+  }).join('');
+  wrap.addEventListener('click',e=>{
+    const c=e.target.closest('.chip');if(!c)return;
+    $(inputSel).value=c.dataset.q;
+  });
+}
+dateQuick('#ledDateQuick','#ledDate');
+dateQuick('#spDateQuick','#spDate');
 /* 金额输入：小数点与逗号都可作为小数分隔符，逗号实时归一为点；只保留数字与一个小数点 */
 $('#ledAmount').addEventListener('input',e=>{
   let v=e.target.value.replace(/[^\d.,]/g,'').replace(/,/g,'.');
@@ -960,9 +1172,16 @@ $('#ledAmount').addEventListener('input',e=>{
 $('#ledSave').onclick=()=>{
   const amt=parseFloat(($('#ledAmount').value||'').replace(/,/g,'.'));
   if(!amt||amt<=0){toast('请输入有效金额');return}
-  ledger.push({id:uid(),type:ledgerType,amount:+amt.toFixed(2),cat:ledgerCat,
-    date:$('#ledDate').value||todayStr(),note:$('#ledNote').value.trim(),created:Date.now()});
-  saveLedger();closeSheets();renderLedger();toast('已记录');
+  const date=$('#ledDate').value||todayStr(),note=$('#ledNote').value.trim();
+  if(editingLedId){
+    const r=ledger.find(x=>x.id===editingLedId);
+    if(r){r.type=ledgerType;r.amount=+amt.toFixed(2);r.cat=ledgerCat;r.date=date;r.note=note;ledMonth=date.slice(0,7)}
+    editingLedId=null;
+    saveLedger();closeSheets();renderLedger();toast('已更新');
+  }else{
+    ledger.push({id:uid(),type:ledgerType,amount:+amt.toFixed(2),cat:ledgerCat,date,note,created:Date.now()});
+    saveLedger();closeSheets();renderLedger();toast('已记录');
+  }
 };
 
 /* ================= 旅行模块 + 足迹地图 ================= */
@@ -1108,7 +1327,7 @@ function sportIcon(n){
   if(/拉伸|瑜伽/.test(n))return'🧘';
   return'🏅';
 }
-let sportType='跑步';
+let sportType='跑步',editingSpId=null;
 function renderSport(){
   const m=todayStr().slice(0,7);
   const ms=sports.filter(r=>r.date.startsWith(m));
@@ -1130,12 +1349,61 @@ function renderSport(){
     </div>`).join('')
     :'<div class="empty"><div class="big">🏃</div>动起来！点右下角 ＋ 看推荐运动</div>';
   if(curTab==='sport')renderSub();
+  renderSpHeat();
 }
 $('#sportList').addEventListener('click',e=>{
-  const btn=e.target.closest('[data-act="del"]');if(!btn)return;
-  const id=btn.closest('[data-id]').dataset.id;
-  sports=sports.filter(x=>x.id!==id);saveSports();renderSport();
+  const row=e.target.closest('.row');if(!row)return;
+  const id=row.dataset.id;
+  const btn=e.target.closest('[data-act="del"]');
+  if(btn){
+    const i=sports.findIndex(x=>x.id===id);if(i<0)return;const it=sports[i];sports.splice(i,1);
+    saveSports();renderSport();
+    toast('已删除记录',{label:'撤销',fn:()=>{sports.splice(Math.min(i,sports.length),0,it);saveSports();renderSport()}});
+    return;
+  }
+  const r=sports.find(x=>x.id===id);if(!r)return;
+  editingSpId=r.id;
+  const known=SPORTS.find(s=>s[0]===r.type);
+  sportType=known?r.type:'其他';
+  $$('#spCats .chip').forEach(x=>x.classList.toggle('on',x.dataset.v===sportType));
+  $('#spCustomWrap').style.display=sportType==='其他'?'':'none';
+  $('#spCustom').value=known?'':r.type;
+  $('#spMin').value=r.dur||'';
+  $('#spQty').value=r.qty||'';
+  $('#spDate').value=r.date;
+  $('#spTitle').textContent='编辑运动';
+  openSheet('sheet-sport');
 });
+/* 连续打卡：从今天往前数（今天没记就从昨天数） */
+function dayStreak(set){
+  const d=new Date();d.setHours(0,0,0,0);
+  if(!set.has(dateKey(d)))d.setDate(d.getDate()-1);
+  let n=0;
+  while(set.has(dateKey(d))){n++;d.setDate(d.getDate()-1)}
+  return n;
+}
+/* 运动热图：近 12 周，周一在上 */
+function renderSpHeat(){
+  const wrap=$('#spHeat');if(!wrap)return;
+  const byDate={};
+  sports.forEach(r=>{byDate[r.date]=(byDate[r.date]||0)+(+r.dur||0)});
+  const now=new Date();now.setHours(0,0,0,0);
+  const start=new Date(now);start.setDate(now.getDate()-((now.getDay()+6)%7)-7*11);
+  let html='';
+  for(let w=0;w<12;w++){
+    let col='<div class="hm-col">';
+    for(let d=0;d<7;d++){
+      const dt=new Date(start);dt.setDate(start.getDate()+w*7+d);
+      const key=dateKey(dt),fut=dt>now,dur=byDate[key]||0;
+      const lv=dur<=0?'':dur<30?' lv1':dur<60?' lv2':' lv3';
+      col+='<div class="hm'+(fut?' f':'')+lv+'" title="'+key+(dur?' · '+dur+' 分钟':'')+'"></div>';
+    }
+    html+=col+'</div>';
+  }
+  wrap.innerHTML=html;
+  const n=dayStreak(new Set(sports.map(r=>r.date)));
+  $('#spStreak').textContent=n>=7?'🔥 连续 '+n+' 天':n>0?'连续 '+n+' 天':'今天还没打卡';
+}
 function buildSpCats(){
   $('#spCats').innerHTML=SPORTS.map((c,i)=>`<button class="chip${i===0?' on':''}" data-v="${c[0]}">${c[1]} ${c[0]}</button>`).join('');
 }
@@ -1151,13 +1419,21 @@ $('#spSave').onclick=()=>{
   if(!dur||dur<=0){toast('请输入运动时长');return}
   const custom=$('#spCustom').value.trim();
   const type=(sportType==='其他'&&custom)?custom:sportType;
-  sports.push({id:uid(),type,dur,qty:$('#spQty').value.trim(),date:$('#spDate').value||todayStr(),created:Date.now()});
-  saveSports();recUse('sport',type);closeSheets();renderSport();toast('已记录，继续加油 💪');
+  const qty=$('#spQty').value.trim(),date=$('#spDate').value||todayStr();
+  if(editingSpId){
+    const r=sports.find(x=>x.id===editingSpId);
+    if(r){r.type=type;r.dur=dur;r.qty=qty;r.date=date}
+    editingSpId=null;
+    saveSports();closeSheets();renderSport();toast('已更新');
+  }else{
+    sports.push({id:uid(),type,dur,qty,date,created:Date.now()});
+    saveSports();recUse('sport',type);closeSheets();renderSport();toast('已记录，继续加油 💪');
+  }
 };
 
 /* ================= 工作模块 ================= */
 const WK_CATS=['报关','项目','会议','邮件','整理','其他'];
-let wkCat=WK_CATS[0],wkPri='中';
+let wkCat=WK_CATS[0],wkPri='中',editingWkId=null;
 function buildWkCats(){$('#wkCats').innerHTML=WK_CATS.map((c,i)=>`<button class="chip${i===0?' on':''}" data-v="${c}">${c}</button>`).join('')}
 $('#wkCats').addEventListener('click',e=>{
   const c=e.target.closest('.chip');if(!c)return;
@@ -1195,16 +1471,38 @@ function renderWork(){
 $('#workList').addEventListener('click',e=>{
   const row=e.target.closest('.row');if(!row||!row.dataset.id)return;
   const id=row.dataset.id,act=e.target.closest('[data-act]');
-  if(!act)return;
-  if(act.dataset.act==='toggle'){const w=work.find(x=>x.id===id);if(w){w.done=!w.done;saveWork();renderWork()}}
-  else if(act.dataset.act==='del'){work=work.filter(x=>x.id!==id);saveWork();renderWork()}
+  if(act){
+    if(act.dataset.act==='toggle'){const w=work.find(x=>x.id===id);if(w){w.done=!w.done;saveWork();renderWork()}}
+    else if(act.dataset.act==='del'){
+      const i=work.findIndex(x=>x.id===id);if(i<0)return;const it=work[i];work.splice(i,1);
+      saveWork();renderWork();
+      toast('已删除工作',{label:'撤销',fn:()=>{work.splice(Math.min(i,work.length),0,it);saveWork();renderWork()}});
+    }
+    return;
+  }
+  const w=work.find(x=>x.id===id);if(!w)return;
+  editingWkId=w.id;
+  $('#wkTitle').value=w.title;$('#wkNote').value=w.note||'';
+  wkCat=WK_CATS.includes(w.cat)?w.cat:'其他';
+  $$('#wkCats .chip').forEach(x=>x.classList.toggle('on',x.dataset.v===wkCat));
+  wkPri=w.pri||'中';
+  $$('#wkPri button').forEach(x=>x.classList.toggle('on',x.dataset.p===wkPri));
+  $('#wkSheetTitle').textContent='编辑工作';
+  openSheet('sheet-work');
 });
 $('#fabWork').onclick=()=>openRec('work');
 $('#wkSave').onclick=()=>{
   const t=$('#wkTitle').value.trim();
   if(!t){toast('请输入工作内容');return}
-  work.push({id:uid(),title:t,cat:wkCat,pri:wkPri,note:$('#wkNote').value.trim(),done:false,created:Date.now()});
-  saveWork();recUse('work',t);closeSheets();renderWork();toast('已添加');
+  if(editingWkId){
+    const w=work.find(x=>x.id===editingWkId);
+    if(w){w.title=t;w.cat=wkCat;w.pri=wkPri;w.note=$('#wkNote').value.trim()}
+    editingWkId=null;
+    saveWork();closeSheets();renderWork();toast('已更新');
+  }else{
+    work.push({id:uid(),title:t,cat:wkCat,pri:wkPri,note:$('#wkNote').value.trim(),done:false,created:Date.now()});
+    saveWork();recUse('work',t);closeSheets();renderWork();toast('已添加');
+  }
 };
 
 /* ================= 菜单模块（存量食材 → 推荐菜品） ================= */
@@ -1774,7 +2072,7 @@ window.addEventListener('touchend',()=>{pdOn=false},{passive:true});
 /* ================= 数据备份（JSON 导出 / 导入） ================= */
 $('#bkExport').onclick=()=>{
   const data={app:'Yichi工作台',ver:1,exported:new Date().toISOString(),
-    tasks,ledger,trips,sports,work,pantry,geoMan,rec:recData};
+    tasks,ledger,trips,sports,work,pantry,geoMan,rec:recData,budget:+store.get('wb.budget',0)||0};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1800,12 +2098,13 @@ $('#bkFile').addEventListener('change',async e=>{
   if(Array.isArray(d.pantry)){pantry=d.pantry;savePantry()}
   if(Array.isArray(d.geoMan)){geoMan=d.geoMan;saveGeo()}
   if(d.rec&&typeof d.rec==='object'){recData=d.rec;saveRec()}
+  if(typeof d.budget==='number'){store.set('wb.budget',d.budget)}
   renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderSub();
   closeSheets();toast('导入完成 · 数据已恢复');
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.7.2';
+const WB_VER='1.8.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
