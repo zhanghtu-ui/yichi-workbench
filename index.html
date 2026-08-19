@@ -457,7 +457,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <button data-t="income">收入</button>
     </div>
     <div class="field"><label>金额（€）</label>
-      <input id="ledAmount" class="amount-input" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+      <input id="ledAmount" class="amount-input" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0.00">
     </div>
     <div class="field"><label>类别</label><div class="chips" id="ledCats"></div></div>
     <div class="field"><label>日期</label><input id="ledDate" type="date"></div>
@@ -949,8 +949,15 @@ $('#fabLedger').onclick=()=>{
   $('#ledAmount').value='';$('#ledNote').value='';$('#ledDate').value=todayStr();
   openSheet('sheet-ledger');
 };
+/* 金额输入：小数点与逗号都可作为小数分隔符，逗号实时归一为点；只保留数字与一个小数点 */
+$('#ledAmount').addEventListener('input',e=>{
+  let v=e.target.value.replace(/[^\d.,]/g,'').replace(/,/g,'.');
+  const i=v.indexOf('.');
+  if(i>-1)v=v.slice(0,i+1)+v.slice(i+1).replace(/\./g,'');
+  if(v!==e.target.value)e.target.value=v;
+});
 $('#ledSave').onclick=()=>{
-  const amt=parseFloat($('#ledAmount').value);
+  const amt=parseFloat(($('#ledAmount').value||'').replace(/,/g,'.'));
   if(!amt||amt<=0){toast('请输入有效金额');return}
   ledger.push({id:uid(),type:ledgerType,amount:+amt.toFixed(2),cat:ledgerCat,
     date:$('#ledDate').value||todayStr(),note:$('#ledNote').value.trim(),created:Date.now()});
