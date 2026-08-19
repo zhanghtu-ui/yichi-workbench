@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=3">
+<link rel="manifest" href="manifest.json?v=4">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -566,6 +566,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     </div>
     <input type="file" id="bkFile" accept=".json,application/json" style="display:none">
     <div class="acc-sub" style="margin-top:8px;text-align:center">导出为 JSON 文件，换设备时导入即可恢复全部数据</div>
+    <div class="acc-sub" id="verLine" style="margin-top:16px;text-align:center;color:#6E5F7E"></div>
   </div>
 </div>
 
@@ -1802,6 +1803,10 @@ $('#bkFile').addEventListener('change',async e=>{
   renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderSub();
   closeSheets();toast('导入完成 · 数据已恢复');
 });
+
+/* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
+const WB_VER='1.7.2';
+$('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
 $$('.mod').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
