@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=10">
+<link rel="manifest" href="manifest.json?v=11">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -173,7 +173,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .geo-prov{fill:none;stroke:rgba(255,111,181,.45);stroke-width:.7;vector-effect:non-scaling-stroke}
 .gm{fill:none;stroke:rgba(245,238,248,.4);stroke-width:1.1}
 .gm.lit{fill:url(#geoG);stroke:none;filter:drop-shadow(0 0 4px rgba(255,111,181,.95))}
-.gm-hit{fill:transparent;cursor:pointer}
+.gm-lbl{fill:#FFE0F0;font-weight:600;pointer-events:none;white-space:nowrap;paint-order:stroke;stroke:rgba(21,16,32,.85);stroke-width:2.5px;vector-effect:non-scaling-stroke;stroke-linejoin:round}
 .geo-zoom{position:absolute;right:6px;top:6px;display:flex;flex-direction:column;gap:6px;z-index:2}
 .geo-zoom button{width:30px;height:30px;border-radius:9px;border:none;background:rgba(43,34,56,.9);color:var(--label);font-size:16px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .geo-zoom button:active{background:var(--sky-tint);color:var(--sky-deep)}
@@ -424,7 +424,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
           <button type="button" id="gzRe" aria-label="复位">⟲</button>
         </div>
       </div>
-      <div class="geo-tip" id="geoTip">点亮跟随旅行记录自动生成 · 点地图可手动点亮/熄灭 · 拖动平移 · 放大看省份与热门城市</div>
+      <div class="geo-tip" id="geoTip">点亮由旅行记录自动生成 · 拖动平移 · 放大看省份轮廓与热门城市名称</div>
       <div class="geo-arch" id="geoArch"></div>
     </div>
   </section>
@@ -1286,6 +1286,14 @@ function applyGeoView(){
   const w=geoView.w,k=w/720;
   svg.setAttribute('viewBox',`${geoView.x} ${geoView.y} ${w} ${w/2}`);
   svg.querySelectorAll('.gm').forEach(c=>c.setAttribute('r',(+c.dataset.cr||4.5)*k));
+  const rect=svg.getBoundingClientRect();
+  const s=rect.width>0?rect.width/w:0.5;
+  const fs=11/s;
+  svg.querySelectorAll('.gm-lbl').forEach(t=>{
+    t.setAttribute('font-size',fs.toFixed(2));
+    t.setAttribute('x',(+t.dataset.cx+fs*0.55).toFixed(1));
+    t.setAttribute('y',(+t.dataset.cy+fs*0.35).toFixed(1));
+  });
   const cn=$('#geoCN');if(cn)cn.style.display=w<=420?'':'none';
   const cg=$('#geoCityG');if(cg)cg.style.display=w<=300?'':'none';
 }
@@ -1310,7 +1318,7 @@ function renderGeo(){
     <g id="geoCN" style="display:none"><path class="geo-prov" d="${CN_PROV}"/></g>
     ${GEO_COUNTRIES.filter(c=>vis.has(c.k)).map(c=>dot(c,4.5)).join('')}
     ${GEO_PROVS.filter(p=>vis.has(p.k)).map(p=>dot(p,4.5)).join('')}
-    <g id="geoCityG" style="display:none">${GEO_CITIES.filter(c=>vis.has(c.k)).map(c=>dot(c,3.5)).join('')}</g>
+    <g id="geoCityG" style="display:none">${GEO_CITIES.filter(c=>vis.has(c.k)).map(c=>{const[x,y]=geoXY(c.c);return `<circle class="gm lit" data-cr="3.5" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5"/><text class="gm-lbl" data-cx="${x.toFixed(1)}" data-cy="${y.toFixed(1)}" x="${(x+6).toFixed(1)}" y="${(y+3.5).toFixed(1)}">${esc(c.k)}</text>`}).join('')}</g>
   </svg>`;
   applyGeoView();
   const litList=[...GEO_COUNTRIES.filter(c=>vis.has(c.k)),...GEO_PROVS.filter(p=>vis.has(p.k)),...GEO_CITIES.filter(c=>vis.has(c.k))].map(x=>x.k);
@@ -1324,7 +1332,7 @@ $('#gzRe').addEventListener('click',()=>{geoView={x:0,y:0,w:720};applyGeoView()}
 (function(){
   const el=$('#geoMap');
   const ptrs=new Map();
-  let pinchD=0,moved=0;
+  let pinchD=0;
   const svgXY=(cx,cy)=>{
     const r=el.getBoundingClientRect();
     return [geoView.x+(cx-r.left)/r.width*geoView.w,geoView.y+(cy-r.top)/r.height*(geoView.w/2)];
@@ -1332,7 +1340,6 @@ $('#gzRe').addEventListener('click',()=>{geoView={x:0,y:0,w:720};applyGeoView()}
   el.addEventListener('pointerdown',e=>{
     el.setPointerCapture(e.pointerId);
     ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    moved=0;
     if(ptrs.size===2){
       const[a,b]=[...ptrs.values()];
       pinchD=Math.hypot(a.x-b.x,a.y-b.y);
@@ -1342,7 +1349,6 @@ $('#gzRe').addEventListener('click',()=>{geoView={x:0,y:0,w:720};applyGeoView()}
     const p=ptrs.get(e.pointerId);if(!p)return;
     const dx=e.clientX-p.x,dy=e.clientY-p.y;
     p.x=e.clientX;p.y=e.clientY;
-    moved+=Math.abs(dx)+Math.abs(dy);
     if(ptrs.size===2){
       const[a,b]=[...ptrs.values()];
       const d=Math.hypot(a.x-b.x,a.y-b.y);
@@ -1362,22 +1368,7 @@ $('#gzRe').addEventListener('click',()=>{geoView={x:0,y:0,w:720};applyGeoView()}
     e.preventDefault();
     geoZoomAt(...svgXY(e.clientX,e.clientY),e.deltaY<0?1.25:1/1.25);
   },{passive:false});
-  el.addEventListener('click',e=>{
-    if(moved>8)return;
-    const[sx,sy]=svgXY(e.clientX,e.clientY);
-    const k=geoView.w/720;
-    let pool=[...GEO_COUNTRIES,...GEO_PROVS];
-    if(geoView.w<=300)pool=pool.concat(GEO_CITIES);
-    const hit=pool.map(p=>({p,d:Math.hypot(geoXY(p.c)[0]-sx,geoXY(p.c)[1]-sy)}))
-      .filter(o=>o.d<=16*k).sort((a,b)=>a.d-b.d)[0];
-    if(!hit)return;
-    const name=hit.p.k;
-    const auto=geoAutoSet().has(name);
-    if(auto){toast('该地由旅行历史自动点亮');return}
-    if(geoMan.includes(name))geoMan=geoMan.filter(x=>x!==name);
-    else{geoMan.push(name);toast('点亮 '+name)}
-    saveGeo();renderGeo();renderSub();
-  });
+  // 点亮仅由旅行历史自动生成，地图点击不再手动点亮/熄灭（v1.12.0）
 })();
 function tripStatus(t){
   const today=todayStr();
@@ -2300,7 +2291,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.11.0';
+const WB_VER='1.12.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
