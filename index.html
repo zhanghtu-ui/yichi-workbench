@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=5">
+<link rel="manifest" href="manifest.json?v=6">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -169,6 +169,10 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{padding:8px 14px;border-radius:20px;background:var(--card);font-size:14px;border:none;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:.15s}
 .chip.on{background:var(--sky-tint);color:var(--sky-deep);font-weight:600}
+.chip-amt{opacity:.65;font-size:12px;font-weight:600;margin-left:4px}
+.chip.on .chip-amt{opacity:.85}
+.cat-sum{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--label2);margin:-2px 2px 10px;padding:9px 12px;background:var(--card);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.cat-sum b{color:var(--label);font-size:14px}
 .chips.big .chip{padding:13px 18px;font-size:15px;border-radius:14px}
 .chips.geo .chip{padding:7px 12px;font-size:13px;color:var(--label2)}
 .chips.geo .chip.lit{background:linear-gradient(135deg,var(--sky),var(--sky-deep));color:#fff;font-weight:600;box-shadow:0 3px 8px rgba(255,111,181,.35)}
@@ -380,6 +384,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <button data-f="income">收入</button>
     </div>
     <div class="chips" id="ledCatFilter" style="margin:10px 2px 12px"></div>
+    <div id="ledCatSum"></div>
     <div id="ledgerList"></div>
   </section>
 
@@ -950,15 +955,25 @@ function renderLedger(){
   const rows=ledger
     .filter(r=>r.date.startsWith(m)&&(ledgerFilter==='all'||r.type===ledgerFilter)&&(ledCatFilter==='all'||r.cat===ledCatFilter))
     .sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:b.created-a.created);
+  /* 分类小计条 */
+  const cs=$('#ledCatSum');
+  if(ledCatFilter==='all'){cs.innerHTML=''}
+  else{
+    const o=rows.filter(r=>r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
+    const i=rows.filter(r=>r.type==='income').reduce((a,b)=>a+ +b.amount,0);
+    const amt=(o>0&&i>0)?'支 '+fmtMoney(o)+' · 收 '+fmtMoney(i):'小计 '+fmtMoney(o||i);
+    const itype=CATS.expense.some(x=>x[0]===ledCatFilter)?'expense':'income';
+    cs.innerHTML='<div class="cat-sum"><span>'+catIcon(itype,ledCatFilter)+' '+esc(ledCatFilter)+' · '+rows.length+' 笔</span><b>'+amt+'</b></div>';
+  }
   if(!rows.length){
-    $('#ledgerList').innerHTML='<div class="empty"><div class="big">💶</div>还没有记录，点右下角 ＋ 记一笔</div>';
+    $('#ledgerList').innerHTML='<div class="empty"><div class="big">💶</div>'+(ledCatFilter==='all'?'还没有记录，点右下角 ＋ 记一笔':'该分类下暂无记录')+'</div>';
   }else{
     let html='',last='';
     rows.forEach(r=>{
       if(r.date!==last){
         if(last)html+='</div>';
         last=r.date;
-        const dayRows=ledger.filter(x=>x.date===r.date);
+        const dayRows=ledger.filter(x=>x.date===r.date&&(ledgerFilter==='all'||x.type===ledgerFilter)&&(ledCatFilter==='all'||x.cat===ledCatFilter));
         const dOut=dayRows.filter(x=>x.type==='expense').reduce((a,b)=>a+ +b.amount,0);
         const dIn=dayRows.filter(x=>x.type==='income').reduce((a,b)=>a+ +b.amount,0);
         const parts=[];if(dOut)parts.push('支 '+fmtMoney(dOut));if(dIn)parts.push('收 '+fmtMoney(dIn));
@@ -1088,7 +1103,10 @@ $('#mNext').onclick=()=>{
   if(nk>todayStr().slice(0,7))return;
   ledMonth=nk;renderLedger();
 };
-/* 分类筛选 */
+/* 分类筛选（每个分类 chip 显示当月小计） */
+function catMonthSum(type,name){
+  return ledger.filter(r=>r.date.startsWith(ledMonth)&&r.type===type&&r.cat===name).reduce((a,b)=>a+ +b.amount,0);
+}
 function buildLedCatFilter(){
   let names;
   if(ledgerFilter==='all'){
@@ -1096,7 +1114,12 @@ function buildLedCatFilter(){
     CATS.expense.concat(CATS.income).forEach(c=>{if(!seen.has(c[0])){seen.add(c[0]);names.push(c)}});
   }else names=CATS[ledgerFilter];
   $('#ledCatFilter').innerHTML='<button class="chip'+(ledCatFilter==='all'?' on':'')+'" data-c="all">全部</button>'
-    +names.map(c=>'<button class="chip'+(ledCatFilter===c[0]?' on':'')+'" data-c="'+esc(c[0])+'">'+c[1]+' '+esc(c[0])+'</button>').join('');
+    +names.map(c=>{
+      const type=ledgerFilter==='all'?(CATS.expense.some(x=>x[0]===c[0])?'expense':'income'):ledgerFilter;
+      const s=catMonthSum(type,c[0]);
+      return '<button class="chip'+(ledCatFilter===c[0]?' on':'')+'" data-c="'+esc(c[0])+'">'+c[1]+' '+esc(c[0])
+        +(s>0?'<span class="chip-amt">'+fmtMoney(s)+'</span>':'')+'</button>';
+    }).join('');
 }
 $('#ledCatFilter').addEventListener('click',e=>{
   const c=e.target.closest('.chip');if(!c)return;
@@ -2104,7 +2127,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.8.0';
+const WB_VER='1.8.1';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
