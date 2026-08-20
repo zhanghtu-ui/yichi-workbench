@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=6">
+<link rel="manifest" href="manifest.json?v=7">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -192,6 +192,17 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .mini-add{width:32px;height:32px;flex:none;border-radius:50%;border:none;background:var(--sky-tint);color:var(--sky-deep);display:flex;align-items:center;justify-content:center}
 .mini-add svg{width:16px;height:16px}
 .mini-add:active{background:rgba(255,111,181,.3)}
+.trip-card.next{box-shadow:0 0 0 1.5px var(--sky-deep),0 6px 18px rgba(255,111,181,.28)}
+.trip-card.past{opacity:.82}
+.trip-sec{font-size:12px;color:var(--label2);font-weight:600;margin:16px 2px 8px}
+.trip-acts{display:flex;justify-content:flex-end;gap:2px;margin-top:4px}
+.pack-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--label2);padding:10px 2px 6px;cursor:pointer}
+.pack-head:active{opacity:.6}
+.pack-head .arr{display:inline-block;transition:transform .2s;font-size:11px;flex:none}
+.pack-head.open .arr{transform:rotate(90deg)}
+.pack-track{flex:1;height:5px;border-radius:3px;background:var(--ink);overflow:hidden;min-width:40px}
+.pack-track i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--sky),var(--sky-deep))}
+.pack-n{flex:none}
 
 /* ===== 运动 ===== */
 .sp-row .sp-ic{width:40px;height:40px;border-radius:50%;background:var(--sky-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
@@ -390,11 +401,11 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 
   <!-- ========== 旅行计划 ========== -->
   <section class="page" id="page-travel">
-    <div class="card pad">
+    <div id="tripList"></div>
+    <div class="card pad" style="margin-top:14px">
       <div class="geo-top"><span class="geo-title">🗺️ 足迹地图</span><span class="geo-stats" id="geoStats"></span></div>
       <div id="geoGroups"></div>
     </div>
-    <div id="tripList"></div>
   </section>
 
   <!-- ========== 运动 ========== -->
@@ -527,7 +538,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <div class="handle"></div>
   <div class="sheet-head">
     <button class="cancel">取消</button>
-    <span class="title">新旅行计划</span>
+    <span class="title" id="trTitle">新旅行计划</span>
     <span style="width:44px"></span>
   </div>
   <div class="sheet-body">
@@ -535,7 +546,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <div class="field"><label>开始日期</label><input id="trStart" type="date"></div>
     <div class="field"><label>结束日期</label><input id="trEnd" type="date"></div>
     <div class="field"><label>备注</label><textarea id="trNote" placeholder="交通、住宿、同行人…（选填）" maxlength="200"></textarea></div>
-    <label class="pack-row"><input type="checkbox" id="trPack" checked><span>生成常用打包清单（证件 / 充电器 / 洗漱…）</span></label>
+    <label class="pack-row" id="trPackRow"><input type="checkbox" id="trPack" checked><span>生成常用打包清单（证件 / 充电器 / 洗漱…）</span></label>
     <button class="btn" id="trSave">保存</button>
   </div>
 </div>
@@ -760,6 +771,9 @@ function onRecPick(ctx,text){
     saveTasks();recUse('tasks',text);renderTasks();renderRec();toast('已添加');
   }else if(ctx==='travel'){
     closeSheets();
+    editingTripId=null;
+    $('#trTitle').textContent='新旅行计划';
+    $('#trPackRow').style.display='';
     $('#trDest').value=text;$('#trStart').value=todayStr();$('#trEnd').value=todayStr();$('#trNote').value='';
     $('#trPack').checked=true;
     openSheet('sheet-travel');
@@ -1249,50 +1263,68 @@ function tripStatus(t){
   if(t.start<=today)return'ongoing';
   return'upcoming';
 }
+let editingTripId=null;
+const tripPackState={};
+const tripDur=t=>Math.round((dOnly(t.end)-dOnly(t.start))/864e5)+1;
 function renderTravel(){
   renderGeo();
-  const list=trips.slice().sort((a,b)=>{
-    const ea=tripStatus(a)==='ended',eb=tripStatus(b)==='ended';
-    if(ea!==eb)return ea-eb;
-    return a.start<b.start?-1:a.start>b.start?1:0;
-  });
-  if(!list.length){
-    $('#tripList').innerHTML='<div class="empty"><div class="big">✈️</div>世界那么大，先定个小目标<br>点右下角 ＋ 看推荐目的地</div>';
-    return;
-  }
-  $('#tripList').innerHTML=list.map(t=>{
+  const today=todayStr();
+  const act=trips.filter(t=>tripStatus(t)!=='ended').sort((a,b)=>a.start<b.start?-1:a.start>b.start?1:0);
+  const past=trips.filter(t=>tripStatus(t)==='ended').sort((a,b)=>a.start<b.start?1:a.start>b.start?-1:0);
+  const nxt=act.find(t=>tripStatus(t)==='upcoming');
+  const cardHtml=t=>{
     const st=tripStatus(t);
     let badge;
     if(st==='upcoming'){
-      const days=Math.round((dOnly(t.start)-dOnly(todayStr()))/864e5);
-      badge=`<span class="badge b-up">还有 ${days} 天出发</span>`;
-    }else if(st==='ongoing'){badge='<span class="badge b-on">进行中</span>'}
-    else{badge='<span class="badge b-end">已结束</span>'}
-    const range=t.start===t.end?cnDate(t.start):`${cnDate(t.start)} – ${cnDate(t.end)}`;
-    const todos=(t.todos||[]).map(td=>`
+      const days=Math.round((dOnly(t.start)-dOnly(today))/864e5);
+      badge=`<span class="badge b-up">${days<=0?'今天出发 ✈️':'还有 '+days+' 天'}</span>`;
+    }else if(st==='ongoing'){
+      const day=Math.round((dOnly(today)-dOnly(t.start))/864e5)+1;
+      badge=`<span class="badge b-on">进行中 · 第 ${day}/${tripDur(t)} 天</span>`;
+    }else{badge='<span class="badge b-end">已结束</span>'}
+    const range=(t.start===t.end?cnDate(t.start):`${cnDate(t.start)} – ${cnDate(t.end)}`)+' · 共 '+tripDur(t)+' 天';
+    const todos=t.todos||[];
+    const doneN=todos.filter(x=>x.done).length;
+    const open=tripPackState[t.id]!==undefined?tripPackState[t.id]:st!=='ended';
+    let packHtml='';
+    if(todos.length&&st!=='ended'){
+      const pct=Math.round(doneN/todos.length*100);
+      packHtml=`<div class="pack-head${open?' open':''}" data-act="pack-toggle">
+        <span class="arr">▸</span><span>🧳 打包清单</span>
+        <div class="pack-track"><i style="width:${pct}%"></i></div>
+        <span class="pack-n">${doneN}/${todos.length}</span>
+      </div>`+(open?todos.map(td=>`
       <div class="row todo-row" data-tid="${td.id}">
         <button class="check ${td.done?'done':''}" data-act="todo-toggle">${CHECK}</button>
         <span class="task-body"><span class="task-text ${td.done?'done':''}">${esc(td.text)}</span></span>
         <button class="icon-btn" data-act="todo-del">${TRASH}</button>
-      </div>`).join('');
+      </div>`).join(''):'');
+    }
     return `
-    <div class="card trip-card" data-id="${t.id}">
+    <div class="card trip-card${st==='ended'?' past':''}${nxt&&t.id===nxt.id?' next':''}" data-id="${t.id}">
       <div class="trip-top">
         <div style="flex:1;min-width:0">
           <div class="trip-dest">📍 ${esc(t.dest)}</div>
           <div class="trip-dates">${range}</div>
         </div>
         ${badge}
-        <button class="icon-btn" data-act="del-trip">${TRASH}</button>
       </div>
       ${t.note?`<div class="trip-note">${esc(t.note)}</div>`:''}
-      ${todos}
-      <div class="todo-add">
+      ${packHtml}
+      ${st!=='ended'?`<div class="todo-add">
         <input class="todo-input" type="text" placeholder="添加待办事项…" maxlength="60">
         <button class="mini-add" data-act="todo-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>`:''}
+      <div class="trip-acts">
+        <button class="icon-btn" data-act="edit-trip" aria-label="编辑">${PEN}</button>
+        <button class="icon-btn" data-act="del-trip" aria-label="删除">${TRASH}</button>
       </div>
     </div>`;
-  }).join('');
+  };
+  let html='';
+  if(act.length)html+=act.map(cardHtml).join('');
+  if(past.length)html+=`<div class="trip-sec">已结束的旅行 · ${past.length}</div>`+past.map(cardHtml).join('');
+  $('#tripList').innerHTML=html||'<div class="empty"><div class="big">✈️</div>世界那么大，先定个小目标<br>点右下角 ＋ 看推荐目的地</div>';
   if(curTab==='travel')renderSub();
 }
 function addTripTodo(t,inp){
@@ -1306,7 +1338,18 @@ $('#tripList').addEventListener('click',e=>{
   const act=e.target.closest('[data-act]');if(!act)return;
   const a=act.dataset.act;
   if(a==='del-trip'){
-    if(confirm(`确定删除「${t.dest}」的旅行计划？`)){trips=trips.filter(x=>x.id!==t.id);saveTrips();renderTravel()}
+    const i=trips.findIndex(x=>x.id===t.id);if(i<0)return;const it=trips[i];trips.splice(i,1);
+    saveTrips();renderTravel();
+    toast('已删除「'+t.dest+'」',{label:'撤销',fn:()=>{trips.splice(Math.min(i,trips.length),0,it);saveTrips();renderTravel()}});
+  }else if(a==='edit-trip'){
+    editingTripId=t.id;
+    $('#trDest').value=t.dest;$('#trStart').value=t.start;$('#trEnd').value=t.end;$('#trNote').value=t.note||'';
+    $('#trTitle').textContent='编辑旅行计划';
+    $('#trPackRow').style.display='none';
+    openSheet('sheet-travel');
+  }else if(a==='pack-toggle'){
+    const cur=tripPackState[t.id]!==undefined?tripPackState[t.id]:tripStatus(t)!=='ended';
+    tripPackState[t.id]=!cur;renderTravel();
   }else if(a==='todo-toggle'){
     const td=(t.todos||[]).find(x=>x.id===act.closest('[data-tid]').dataset.tid);
     if(td){td.done=!td.done;saveTrips();renderTravel()}
@@ -1331,9 +1374,17 @@ $('#trSave').onclick=()=>{
   if(!dest){toast('请输入目的地');return}
   let s=$('#trStart').value||todayStr(),e2=$('#trEnd').value||s;
   if(e2<s)e2=s;
-  const todos=$('#trPack').checked?PACK_TPL.map(t=>({id:uid(),text:t,done:false})):[];
-  trips.push({id:uid(),dest,start:s,end:e2,note:$('#trNote').value.trim(),todos,created:Date.now()});
-  saveTrips();recUse('travel',dest);closeSheets();renderTravel();toast('计划已创建');
+  const note=$('#trNote').value.trim();
+  if(editingTripId){
+    const t=trips.find(x=>x.id===editingTripId);
+    if(t){t.dest=dest;t.start=s;t.end=e2;t.note=note;t.updatedAt=Date.now()}
+    editingTripId=null;
+    saveTrips();recUse('travel',dest);closeSheets();renderTravel();toast('已更新');
+  }else{
+    const todos=$('#trPack').checked?PACK_TPL.map(t=>({id:uid(),text:t,done:false})):[];
+    trips.push({id:uid(),dest,start:s,end:e2,note,todos,created:Date.now()});
+    saveTrips();recUse('travel',dest);closeSheets();renderTravel();toast('计划已创建');
+  }
 };
 
 /* ================= 运动模块 ================= */
@@ -2127,7 +2178,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.8.1';
+const WB_VER='1.9.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
