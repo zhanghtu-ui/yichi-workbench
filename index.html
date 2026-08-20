@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=13">
+<link rel="manifest" href="manifest.json?v=14">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -1005,7 +1005,7 @@ $('#doneList').addEventListener('click',e=>{
 
 /* ================= 记账模块 ================= */
 const CATS={
-  expense:[['餐饮','🍜'],['交通','🚗'],['购物','🛍️'],['娱乐','🎬'],['居住','🏠'],['医疗','💊'],['学习','📚'],['其他','📦']],
+  expense:[['餐饮','🍜'],['交通','🚗'],['购物','🛍️'],['娱乐','🎬'],['居住','🏠'],['医疗','💊'],['学习','📚'],['税务','🏛️'],['其他','📦']],
   income:[['工资','💼'],['奖金','🎁'],['理财','📈'],['报销','🧾'],['其他','💶']]
 };
 const catIcon=(type,name)=>{const f=(CATS[type]||[]).find(c=>c[0]===name);return f?f[1]:(type==='income'?'💶':'📦')};
@@ -2474,7 +2474,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.14.0';
+const WB_VER='1.14.1';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
