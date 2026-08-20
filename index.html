@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=11">
+<link rel="manifest" href="manifest.json?v=12">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -173,7 +173,9 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .geo-prov{fill:none;stroke:rgba(255,111,181,.45);stroke-width:.7;vector-effect:non-scaling-stroke}
 .gm{fill:none;stroke:rgba(245,238,248,.4);stroke-width:1.1}
 .gm.lit{fill:url(#geoG);stroke:none;filter:drop-shadow(0 0 4px rgba(255,111,181,.95))}
-.gm-lbl{fill:#FFE0F0;font-weight:600;pointer-events:none;white-space:nowrap;paint-order:stroke;stroke:rgba(21,16,32,.85);stroke-width:2.5px;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.gm-lbl{fill:#FFE0F0;font-weight:600;pointer-events:none;white-space:nowrap;paint-order:stroke;stroke:rgba(21,16,32,.85);stroke-linejoin:round}
+.gm-lbl.off{fill:rgba(245,238,248,.8);font-weight:500}
+.gm-city:not(.on){opacity:.42}
 .geo-zoom{position:absolute;right:6px;top:6px;display:flex;flex-direction:column;gap:6px;z-index:2}
 .geo-zoom button{width:30px;height:30px;border-radius:9px;border:none;background:rgba(43,34,56,.9);color:var(--label);font-size:16px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .geo-zoom button:active{background:var(--sky-tint);color:var(--sky-deep)}
@@ -1285,15 +1287,26 @@ function applyGeoView(){
   const svg=$('#geoSvg');if(!svg)return;
   const w=geoView.w,k=w/720;
   svg.setAttribute('viewBox',`${geoView.x} ${geoView.y} ${w} ${w/2}`);
-  svg.querySelectorAll('.gm').forEach(c=>c.setAttribute('r',(+c.dataset.cr||4.5)*k));
+  svg.querySelectorAll('.gm').forEach(c=>c.setAttribute('r',(+c.getAttribute('data-cr')||4.5)*k));
   const rect=svg.getBoundingClientRect();
-  const s=rect.width>0?rect.width/w:0.5;
-  const fs=11/s;
-  svg.querySelectorAll('.gm-lbl').forEach(t=>{
-    t.setAttribute('font-size',fs.toFixed(2));
-    t.setAttribute('x',(+t.dataset.cx+fs*0.55).toFixed(1));
-    t.setAttribute('y',(+t.dataset.cy+fs*0.35).toFixed(1));
-  });
+  if(rect.width>0){
+    const s=rect.width/w,fs=11/s,sw=fs*0.22,kept=[];
+    svg.querySelectorAll('.gm-city').forEach(g=>{
+      const cx=+g.getAttribute('data-cx'),cy=+g.getAttribute('data-cy');
+      const t=g.querySelector('.gm-lbl');if(!t)return;
+      const sx=(cx-geoView.x)*s,sy=(cy-geoView.y)*s;
+      let ok=sx>=-10&&sx<=rect.width+10&&sy>=-10&&sy<=rect.height+10;
+      if(ok)for(const p of kept){if(Math.abs(p[1]-sy)<14&&Math.abs(p[0]-sx)<48){ok=false;break}}
+      if(ok)kept.push([sx,sy]);
+      t.style.visibility=ok?'':'hidden';
+      if(ok){
+        t.setAttribute('font-size',fs.toFixed(2));
+        t.setAttribute('stroke-width',sw.toFixed(2));
+        t.setAttribute('x',(cx+fs*0.55).toFixed(1));
+        t.setAttribute('y',(cy+fs*0.35).toFixed(1));
+      }
+    });
+  }
   const cn=$('#geoCN');if(cn)cn.style.display=w<=420?'':'none';
   const cg=$('#geoCityG');if(cg)cg.style.display=w<=300?'':'none';
 }
@@ -1310,6 +1323,7 @@ function renderGeo(){
   const gc=geoCounts();
   $('#geoStats').textContent=`已点亮 ${gc.nC} 国 · ${gc.nP} 省 · ${gc.nT} 城`;
   const dot=(p,r)=>{const[x,y]=geoXY(p.c);return `<circle class="gm lit" data-cr="${r}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/>`};
+  const cityG=(c,lit)=>{const[x,y]=geoXY(c.c);return `<g class="gm-city${lit?' on':''}" data-cx="${x.toFixed(1)}" data-cy="${y.toFixed(1)}"><circle class="gm${lit?' lit':''}" data-cr="${lit?3.5:2.6}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${lit?3.5:2.6}"/><text class="gm-lbl${lit?'':' off'}" x="${(x+6).toFixed(1)}" y="${(y+3.5).toFixed(1)}">${esc(c.k)}</text></g>`};
   $('#geoMap').innerHTML=`<svg id="geoSvg" viewBox="0 0 720 360" role="img" aria-label="世界地图">
     <defs><linearGradient id="geoG" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#FF6FB5"/><stop offset="1" stop-color="#9D6BFF"/>
@@ -1318,7 +1332,7 @@ function renderGeo(){
     <g id="geoCN" style="display:none"><path class="geo-prov" d="${CN_PROV}"/></g>
     ${GEO_COUNTRIES.filter(c=>vis.has(c.k)).map(c=>dot(c,4.5)).join('')}
     ${GEO_PROVS.filter(p=>vis.has(p.k)).map(p=>dot(p,4.5)).join('')}
-    <g id="geoCityG" style="display:none">${GEO_CITIES.filter(c=>vis.has(c.k)).map(c=>{const[x,y]=geoXY(c.c);return `<circle class="gm lit" data-cr="3.5" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5"/><text class="gm-lbl" data-cx="${x.toFixed(1)}" data-cy="${y.toFixed(1)}" x="${(x+6).toFixed(1)}" y="${(y+3.5).toFixed(1)}">${esc(c.k)}</text>`}).join('')}</g>
+    <g id="geoCityG" style="display:none">${GEO_CITIES.filter(c=>vis.has(c.k)).map(c=>cityG(c,1)).join('')}${GEO_CITIES.filter(c=>!vis.has(c.k)).map(c=>cityG(c,0)).join('')}</g>
   </svg>`;
   applyGeoView();
   const litList=[...GEO_COUNTRIES.filter(c=>vis.has(c.k)),...GEO_PROVS.filter(p=>vis.has(p.k)),...GEO_CITIES.filter(c=>vis.has(c.k))].map(x=>x.k);
@@ -2291,7 +2305,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.12.0';
+const WB_VER='1.13.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
