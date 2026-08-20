@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=14">
+<link rel="manifest" href="manifest.json?v=15">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -397,6 +397,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
         <div class="ratio-cap" id="ratioCap"></div>
         <div id="catBars"></div>
         <div id="monthReport"></div>
+        <button class="btn" id="reportBtn" style="margin-top:12px">📮 生成月度报告卡</button>
       </div>
       <div id="boardYear" style="display:none">
         <div class="year-chart" id="yearChart"></div>
@@ -469,6 +470,16 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       </div>
       <div class="chips" id="pantryChips"></div>
     </div>
+    <div class="card pad" style="margin-top:14px">
+      <div class="geo-top"><span class="geo-title">🛒 采购清单</span><span class="geo-stats" id="shopCount"></span></div>
+      <div class="input-bar" style="margin:10px 0 12px">
+        <input id="shopInput" type="text" placeholder="添加要买的东西…" autocomplete="off" maxlength="20">
+        <button class="add-round" id="shopAddBtn" aria-label="添加采购项">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div id="shopList"></div>
+    </div>
     <div class="geo-region" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
       <span>推荐菜品 · 按食材匹配</span>
       <button class="link-btn" id="spinBtn">🎡 吃什么</button>
@@ -488,6 +499,8 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <div class="geo-top"><span class="geo-title">📈 近 6 个月存入</span><span class="geo-stats" id="dpChartCap"></span></div>
       <div class="year-chart" id="dpChart"></div>
     </div>
+    <div class="geo-tip" id="dpProj" style="margin-top:10px"></div>
+    <div class="chips" id="depYearSum" style="margin:12px 2px 0"></div>
     <div id="depList"></div>
   </section>
   </main>
@@ -569,9 +582,25 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <input id="ledAmount" class="amount-input" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0.00">
     </div>
     <div class="field"><label>类别</label><div class="chips" id="ledCats"></div></div>
+    <div class="field"><label>关联旅行</label><div class="chips" id="ledTrips"></div></div>
     <div class="field"><label>日期</label><input id="ledDate" type="date"><div class="chips" id="ledDateQuick" style="margin-top:8px"></div></div>
+    <label class="pack-row" style="margin:0 0 12px"><input type="checkbox" id="ledRecur"><span>每月重复 · 之后每月打开自动记一笔</span></label>
     <div class="field"><label>备注</label><input id="ledNote" type="text" placeholder="选填" maxlength="40"></div>
     <button class="btn" id="ledSave">保存</button>
+  </div>
+</div>
+
+<!-- 月度报告弹窗 -->
+<div class="sheet" id="sheet-report">
+  <div class="handle"></div>
+  <div class="sheet-head">
+    <button class="cancel">关闭</button>
+    <span class="title">月度报告</span>
+    <span style="width:44px"></span>
+  </div>
+  <div class="sheet-body">
+    <div id="reportCard"></div>
+    <button class="btn" id="reportSave">💾 保存图片</button>
   </div>
 </div>
 
@@ -1062,7 +1091,7 @@ function renderLedger(){
         <div class="cat-ic ${r.type==='income'?'in':''}">${catIcon(r.type,r.cat)}</div>
         <div class="led-info">
           <div class="led-cat">${esc(r.cat)}</div>
-          ${r.note?`<div class="led-note">${esc(r.note)}</div>`:''}
+          ${r.note?`<div class="led-note">${esc(r.note)}</div>`:(r.recur?'<div class="led-note">🔁 每月重复</div>':'')}
         </div>
         <div class="led-amt ${r.type}">${r.type==='income'?'+':'−'}${fmtMoney(r.amount)}</div>
         <button class="icon-btn" data-act="del" aria-label="删除">${TRASH}</button>
@@ -1166,6 +1195,7 @@ $('#ledgerList').addEventListener('click',e=>{
   $('#ledAmount').value=String(r.amount).replace('.',',');
   $('#ledDate').value=r.date;
   $('#ledNote').value=r.note||'';
+  ledTripId=r.tripId||'';buildLedTrips();$('#ledRecur').checked=!!r.recur;
   $('#ledTitle').textContent='编辑记录';
   openSheet('sheet-ledger');
 });
@@ -1213,12 +1243,25 @@ function renderBudget(out){
     return;
   }
   const pct=Math.round(out/b*100),left=b-out;
+  const moved=deposits.some(d=>d.cat==='预算结余'&&d.date.startsWith(ledMonth));
   el.classList.toggle('over',out>b);
-  el.innerHTML='<span>'+ (+ledMonth.slice(5)) +'月预算 '+fmtMoney(b)+(left>=0?' · 剩余 '+fmtMoney(left):' · 超支 '+fmtMoney(-left))+'</span>'
+  el.innerHTML='<span>'+ (+ledMonth.slice(5)) +'月预算 '+fmtMoney(b)+(left>=0?' · 剩余 '+fmtMoney(left):' · 超支 '+fmtMoney(-left))+(moved?' · 结余已存 🐷':'')+'</span>'
     +'<div class="budget-track"><i style="width:'+Math.min(100,pct)+'%"></i></div>'
+    +(left>0&&!moved?'<button class="link-btn" id="dpTransfer">存结余</button>':'')
     +'<button class="link-btn" id="budgetEdit">改</button>';
 }
 $('#budgetLine').addEventListener('click',e=>{
+  if(e.target.closest('#dpTransfer')){
+    const b=+store.get('wb.budget',0)||0;
+    const out=ledger.filter(r=>r.date.startsWith(ledMonth)&&r.type==='expense').reduce((a,r2)=>a+ +r2.amount,0);
+    const left=+(b-out).toFixed(2);
+    if(left<=0){toast('本月没有结余');return}
+    const date=ledMonth===todayStr().slice(0,7)?todayStr():lastDayOf(ledMonth);
+    deposits.push({id:uid(),date:date,amt:left,cat:'预算结余',note:(+ledMonth.slice(5))+'月预算结余',created:Date.now(),_ut:Date.now()});
+    saveDeps();renderDeposit();renderSub();renderLedger();
+    toast('结余 '+fmtMoney(left)+' 已存入 🐷');
+    return;
+  }
   if(!e.target.closest('#budgetEdit'))return;
   const cur=+store.get('wb.budget',0)||0;
   const v=prompt('每月支出预算（€），填 0 清除预算：',cur?String(cur).replace('.',','):'');
@@ -1229,8 +1272,9 @@ $('#budgetLine').addEventListener('click',e=>{
   renderLedger();
 });
 function buildLedCats(){
-  ledgerCat=CATS[ledgerType][0][0];
-  $('#ledCats').innerHTML=CATS[ledgerType].map((c,i)=>`<button class="chip${i===0?' on':''}" data-v="${c[0]}">${c[1]} ${c[0]}</button>`).join('');
+  const pref=(store.get('wb.ledLastCat',{})||{})[ledgerType];
+  ledgerCat=CATS[ledgerType].some(c=>c[0]===pref)?pref:CATS[ledgerType][0][0];
+  $('#ledCats').innerHTML=CATS[ledgerType].map(c=>`<button class="chip${c[0]===ledgerCat?' on':''}" data-v="${c[0]}">${c[1]} ${c[0]}</button>`).join('');
 }
 $('#ledTypeSeg').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
@@ -1243,10 +1287,23 @@ $('#ledCats').addEventListener('click',e=>{
   $$('#ledCats .chip').forEach(x=>x.classList.toggle('on',x===c));
   ledgerCat=c.dataset.v;
 });
+/* 关联旅行 chips */
+let ledTripId='';
+function buildLedTrips(){
+  const list=trips.slice().sort((a,b)=>a.start<b.start?1:-1).slice(0,5);
+  $('#ledTrips').innerHTML='<button class="chip'+(ledTripId?'':' on')+'" data-id="">不关联</button>'
+    +list.map(t=>'<button class="chip'+(ledTripId===t.id?' on':'')+'" data-id="'+t.id+'">✈️ '+esc(t.dest)+'</button>').join('');
+}
+$('#ledTrips').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  ledTripId=c.dataset.id;
+  $$('#ledTrips .chip').forEach(x=>x.classList.toggle('on',x===c));
+});
 $('#fabLedger').onclick=()=>{
   editingLedId=null;
   $('#ledTitle').textContent='记一笔';
   $('#ledAmount').value='';$('#ledNote').value='';$('#ledDate').value=todayStr();
+  ledTripId='';buildLedTrips();$('#ledRecur').checked=false;
   openSheet('sheet-ledger');
 };
 /* 日期快捷：今天 / 昨天 / 前天 */
@@ -1274,15 +1331,17 @@ $('#ledSave').onclick=()=>{
   const amt=parseFloat(($('#ledAmount').value||'').replace(/,/g,'.'));
   if(!amt||amt<=0){toast('请输入有效金额');return}
   const date=$('#ledDate').value||todayStr(),note=$('#ledNote').value.trim();
+  const recur=$('#ledRecur').checked;
   if(editingLedId){
     const r=ledger.find(x=>x.id===editingLedId);
-    if(r){r.type=ledgerType;r.amount=+amt.toFixed(2);r.cat=ledgerCat;r.date=date;r.note=note;ledMonth=date.slice(0,7)}
+    if(r){r.type=ledgerType;r.amount=+amt.toFixed(2);r.cat=ledgerCat;r.date=date;r.note=note;r.tripId=ledTripId||undefined;r.recur=recur||undefined;ledMonth=date.slice(0,7)}
     editingLedId=null;
     saveLedger();closeSheets();renderLedger();toast('已更新');
   }else{
-    ledger.push({id:uid(),type:ledgerType,amount:+amt.toFixed(2),cat:ledgerCat,date,note,created:Date.now()});
-    saveLedger();closeSheets();renderLedger();toast('已记录');
+    ledger.push({id:uid(),type:ledgerType,amount:+amt.toFixed(2),cat:ledgerCat,date,note,tripId:ledTripId||undefined,recur:recur||undefined,created:Date.now()});
+    saveLedger();closeSheets();renderLedger();toast(recur?'已记录 · 之后每月自动记 🔁':'已记录');
   }
+  const lc=store.get('wb.ledLastCat',{})||{};lc[ledgerType]=ledgerCat;store.set('wb.ledLastCat',lc);
 };
 
 /* ================= 旅行模块 + 足迹地图 ================= */
@@ -1434,6 +1493,22 @@ function tripStatus(t){
 let editingTripId=null;
 const tripPackState={};
 const tripDur=t=>Math.round((dOnly(t.end)-dOnly(t.start))/864e5)+1;
+function tripSpendHtml(t,st,today){
+  const rows=ledger.filter(r=>r.tripId===t.id&&r.type==='expense');
+  const sum=rows.reduce((a,b)=>a+ +b.amount,0);
+  if(sum<=0)return '';
+  let extra='';
+  if(st!=='upcoming'){
+    const days=Math.max(1,Math.round((dOnly(st==='ended'?t.end:today)-dOnly(t.start))/864e5)+1);
+    extra=' · 日均 '+fmtMoney(sum/days);
+  }
+  let cats='';
+  if(st==='ended'){
+    const by={};rows.forEach(r=>{by[r.cat]=(by[r.cat]||0)+ +r.amount});
+    cats=' · '+Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>esc(k)+' '+Math.round(v/sum*100)+'%').join(' · ');
+  }
+  return `<div class="trip-note">💶 本趟花费 ${fmtMoney(sum)}${extra}${cats}</div>`;
+}
 function renderTravel(){
   renderGeo();
   const today=todayStr();
@@ -1478,6 +1553,7 @@ function renderTravel(){
         ${badge}
       </div>
       ${t.note?`<div class="trip-note">${esc(t.note)}</div>`:''}
+      ${tripSpendHtml(t,st,today)}
       ${packHtml}
       ${st!=='ended'?`<div class="todo-add">
         <input class="todo-input" type="text" placeholder="添加待办事项…" maxlength="60">
@@ -1799,14 +1875,17 @@ function renderMenu(){
     :'<span style="font-size:13px;color:var(--label2)">还没有食材，把冰箱里的东西加进来，自动推荐能做的菜。</span>';
   const dishes=pantry.length?dishCalc():[];
   $('#dishList').innerHTML=dishes.length?dishes.map(d=>`
-    <div class="card"><div class="row">
+    <div class="card"><div class="row" style="flex-wrap:wrap;row-gap:8px">
       <div class="cat-ic${d.miss.length?'':' in'}">${d.ic}</div>
       <div class="led-info">
         <div class="led-cat">${esc(d.name)}</div>
         <div class="led-note">${d.miss.length?'还缺 '+d.miss.join('、'):`食材齐全 · ${d.need.length} 样`}</div>
       </div>
       <span class="wk-badge ${d.miss.length?'miss':'ok'}">${d.miss.length?'再买 '+d.miss.length+' 样':'现在可做'}</span>
-      <button class="cook-btn" data-act="cook" data-n="${esc(d.name)}">做完</button>
+      <div style="display:flex;gap:8px;width:100%;justify-content:flex-end">
+        ${d.miss.length?`<button class="cook-btn" data-act="shop-miss" data-n="${esc(d.name)}">买缺料</button>`:''}
+        <button class="cook-btn" data-act="cook" data-n="${esc(d.name)}">做完</button>
+      </div>
     </div></div>`).join('')
     :(pantry.length?'<div class="empty"><div class="big">🍽️</div>当前食材暂无匹配菜品，再加几样试试</div>':'');
   if(curTab==='menu')renderSub();
@@ -1819,8 +1898,19 @@ $('#pantryChips').addEventListener('click',e=>{
   const c=e.target.closest('.chip');if(!c)return;
   pantry=pantry.filter(x=>x!==c.dataset.p);savePantry();renderMenu();
 });
-/* 做完一道菜 → 一键扣掉用掉的食材 */
+/* 做完一道菜 → 一键扣掉用掉的食材；买缺料 → 一键加入采购清单 */
 $('#dishList').addEventListener('click',e=>{
+  const sm=e.target.closest('[data-act="shop-miss"]');
+  if(sm){
+    const d=dishCalc().find(x=>x.name===sm.dataset.n);if(!d)return;
+    let n=0;
+    d.miss.forEach(x=>{
+      if(!shop.some(s=>s.txt===x&&!s.done)){shop.push({id:uid(),txt:x,done:false,created:Date.now(),_ut:Date.now()});n++}
+    });
+    saveShop();renderShop();
+    toast(n?'已加 '+n+' 样到采购清单 🛒':'缺的食材都已在清单里');
+    return;
+  }
   const b=e.target.closest('[data-act="cook"]');if(!b)return;
   const r=RECIPES.find(x=>x[0]===b.dataset.n);if(!r)return;
   const used=r[2].filter(x=>pantry.includes(x));
@@ -1956,9 +2046,9 @@ function enableSwipeDel(sel){
      表结构见 supabase_schema.sql；留空可退回本地 / iCloud 模式。 */
 const WB_CONFIG=Object.assign({SUPABASE_URL:'https://flupnwmpsshkrbfrjofl.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_1P-PNnwKyulHVfFl_XXc9g_5CrIk-A-'},window.__WB_CFG||{});
 
-const SYNC_KEYS={'wb.tasks':'tasks','wb.ledger':'ledger','wb.trips':'travel','wb.sports':'sport','wb.work':'work','wb.pantry':'menu','wb.deposits':'deposit'};
+const SYNC_KEYS={'wb.tasks':'tasks','wb.ledger':'ledger','wb.trips':'travel','wb.sports':'sport','wb.work':'work','wb.pantry':'menu','wb.deposits':'deposit','wb.shop':'shop'};
 /* 内存数组是 UI 的唯一数据源；同步层直接读写这些引用，避免与 localStorage 解析副本脱节 */
-const ARR=()=>({'wb.tasks':tasks,'wb.ledger':ledger,'wb.trips':trips,'wb.sports':sports,'wb.work':work,'wb.pantry':pantry,'wb.deposits':deposits});
+const ARR=()=>({'wb.tasks':tasks,'wb.ledger':ledger,'wb.trips':trips,'wb.sports':sports,'wb.work':work,'wb.pantry':pantry,'wb.deposits':deposits,'wb.shop':shop});
 
 /* ---- Supabase 后端（主数据源：邮箱认证 + records CRUD） ---- */
 const SbBackend={
@@ -2198,7 +2288,7 @@ const Sync={
     if(total)this.renderAll();
     return total;
   },
-  renderAll(){try{renderTasks();renderLedger();renderBoards();renderTravel();renderSport();renderWork();renderMenu();renderSub();renderGeo()}catch(e){}},
+  renderAll(){try{renderTasks();renderLedger();renderBoards();renderTravel();renderSport();renderWork();renderMenu();renderDeposit();renderShop();renderSub();renderGeo()}catch(e){}},
   /* ---- 登录/通道芯片（标题行右侧，点开账户弹窗） ---- */
   renderLoginChip(){
     const el=document.getElementById('loginChip');if(!el)return;
@@ -2314,7 +2404,7 @@ window.addEventListener('touchend',()=>{pdOn=false},{passive:true});
 /* ================= 存款模块 ================= */
 let deposits=store.get('wb.deposits',[]);
 const saveDeps=()=>store.set('wb.deposits',deposits);
-const DEP_CATS=[['工资结余','💼'],['理财收益','📈'],['年终奖','🎁'],['红包','🧧'],['兼职','🧾'],['其他','✨']];
+const DEP_CATS=[['工资结余','💼'],['理财收益','📈'],['年终奖','🎁'],['红包','🧧'],['兼职','🧾'],['预算结余','🎯'],['其他','✨']];
 const depCatIc=n=>{const c=DEP_CATS.find(x=>x[0]===n);return c?c[1]:'✨'};
 let editingDepId=null,depCat=DEP_CATS[0][0];
 const depTotal=()=>deposits.reduce((a,b)=>a+ +b.amt,0);
@@ -2349,6 +2439,20 @@ function renderDeposit(){
       </div><span>${c.k===m?'<b>'+c.l+'</b>':c.l}</span>
     </div>`).join('');
   $('#dpChartCap').textContent='合计 '+fmtMoney(cols.reduce((a,b)=>a+b.v,0));
+  /* 年底预测：近 3 个完整月平均节奏 */
+  const avg=[1,2,3].map(i=>{const d=new Date(now.getFullYear(),now.getMonth()-i,1);return depMonthSum(d.getFullYear()+'-'+pad(d.getMonth()+1))}).reduce((a,b)=>a+b,0)/3;
+  const monthsLeft=11-now.getMonth();
+  const proj=Math.round(depTotal()+avg*monthsLeft);
+  $('#dpProj').textContent=avg>0?'按近 3 个月平均节奏 '+fmtMoney(avg)+'/月 · 年底预计 '+fmtMoney(proj):'开始存入后，这里会显示年底预测 📈';
+  /* 达标庆祝（每个目标值只庆祝一次） */
+  if(g>0&&depTotal()>=g&&+store.get('wb.depCeleb',0)!==g){
+    store.set('wb.depCeleb',g);confetti();toast('存款目标达成 🎉');
+  }
+  /* 按来源年小计 */
+  const yr=m.slice(0,4),ysum={};
+  deposits.filter(r=>r.date.startsWith(yr)).forEach(r=>{ysum[r.cat]=(ysum[r.cat]||0)+ +r.amt});
+  $('#depYearSum').innerHTML='<span style="font-size:12px;color:var(--label2);margin-right:2px">'+yr+' 年 · 按来源</span>'
+    +Object.entries(ysum).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<span class="chip on" style="pointer-events:none">'+depCatIc(k)+' '+esc(k)+' '+fmtMoney(v)+'</span>').join('');
   /* 列表：按月分组 */
   const rows=deposits.slice().sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:(b.created||0)-(a.created||0));
   let html='',curM='';
@@ -2435,12 +2539,122 @@ $('#dpSave').onclick=()=>{
 };
 $('#dpCats').innerHTML=DEP_CATS.map((c,i)=>`<button class="chip${i===0?' on':''}" data-v="${c[0]}">${c[1]} ${c[0]}</button>`).join('');
 dateQuick('#dpDateQuick','#dpDate');
+const lastDayOf=mk=>{const y=+mk.slice(0,4),mo=+mk.slice(5);return mk+'-'+pad(new Date(y,mo,0).getDate())};
+/* 达标庆祝彩带 */
+function confetti(){
+  let st=document.getElementById('cfStyle');
+  if(!st){st=document.createElement('style');st.id='cfStyle';st.textContent='@keyframes cfFall{to{transform:translateY(105vh) rotate(720deg)}}.cf-p{position:fixed;top:-14px;z-index:99;pointer-events:none;animation:cfFall 2.4s linear forwards}';document.head.appendChild(st)}
+  const colors=['#FF6FB5','#9D6BFF','#FFD86B','#9BE0B5','#FFE0F0'];
+  for(let i=0;i<36;i++){
+    const p=document.createElement('i');p.className='cf-p';
+    p.style.cssText='left:'+(Math.random()*100)+'vw;width:'+(6+Math.random()*6)+'px;height:'+(8+Math.random()*8)+'px;background:'+colors[i%5]+';border-radius:2px;animation-delay:'+(Math.random()*0.6)+'s;transform:rotate('+(Math.random()*360)+'deg)';
+    document.body.appendChild(p);setTimeout(()=>p.remove(),3200);
+  }
+}
+/* 每月重复条目：每月首次打开自动补记 */
+function bootRecur(){
+  const mk=todayStr().slice(0,7);let n=0;
+  ledger.filter(t=>t.recur).forEach(t=>{
+    if(t.date.startsWith(mk))return;
+    if(ledger.some(r=>r.recurOf===t.id&&r.date.startsWith(mk)))return;
+    ledger.push({id:uid(),date:todayStr(),type:t.type,amount:t.amount,cat:t.cat,note:t.note||'',recurOf:t.id,created:Date.now(),_ut:Date.now()});
+    n++;
+  });
+  if(n){saveLedger();toast('已自动记 '+n+' 笔每月重复 🔁')}
+}
+/* ================= 采购清单 ================= */
+let shop=store.get('wb.shop',[]);
+const saveShop=()=>store.set('wb.shop',shop);
+function renderShop(){
+  const open=shop.filter(s=>!s.done).length;
+  $('#shopCount').textContent=open?open+' 项待买':'';
+  $('#shopList').innerHTML=shop.length?shop.map(s=>`
+    <div class="row" data-id="${s.id}">
+      <button class="check ${s.done?'done':''}" data-act="shop-toggle">${CHECK}</button>
+      <span class="task-body"><span class="task-text ${s.done?'done':''}">${esc(s.txt)}</span></span>
+      <button class="icon-btn" data-act="shop-del">${TRASH}</button>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--label2);padding:4px 2px">下面菜品缺的食材，可一键加进来。</div>';
+}
+$('#shopAddBtn').onclick=()=>{
+  const v=$('#shopInput').value.trim();if(!v)return;
+  shop.push({id:uid(),txt:v,done:false,created:Date.now(),_ut:Date.now()});
+  saveShop();renderShop();$('#shopInput').value='';
+};
+$('#shopInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.isComposing){$('#shopAddBtn').onclick()}
+});
+$('#shopList').addEventListener('click',e=>{
+  const row=e.target.closest('.row');if(!row)return;
+  const s=shop.find(x=>x.id===row.dataset.id);if(!s)return;
+  if(e.target.closest('[data-act="shop-del"]')){
+    const i=shop.indexOf(s);shop.splice(i,1);saveShop();renderShop();
+    toast('已删除',{label:'撤销',fn:()=>{shop.splice(Math.min(i,shop.length),0,s);saveShop();renderShop()}});
+    return;
+  }
+  s.done=!s.done;s._ut=Date.now();saveShop();renderShop();
+});
+/* ================= 月度报告卡 ================= */
+let lastReport=null;
+function buildReport(){
+  const mk=ledMonth,y=+mk.slice(0,4),mo=+mk.slice(5);
+  const ms=ledger.filter(r=>r.date.startsWith(mk));
+  const out=ms.filter(r=>r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
+  const inc=ms.filter(r=>r.type==='income').reduce((a,b)=>a+ +b.amount,0);
+  const dep=depMonthSum(mk);
+  const by={};ms.filter(r=>r.type==='expense').forEach(r=>{by[r.cat]=(by[r.cat]||0)+ +r.amount});
+  const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const sp=sports.filter(r=>r.date.startsWith(mk));
+  const spMin=sp.reduce((a,b)=>a+(+b.dur||0),0);
+  const doneTasks=tasks.filter(t=>t.done&&t.doneAt&&dateKey(new Date(t.doneAt)).startsWith(mk)).length;
+  const tr=trips.filter(t=>t.start.startsWith(mk)||t.end.startsWith(mk));
+  const rows=[
+    ['💶','本月收入',fmtMoney(inc)],
+    ['🛍️','本月支出',fmtMoney(out)],
+    ['🐷','本月存入','+'+fmtMoney(dep)],
+    ['🎯','储蓄率',inc>0?Math.round(dep/inc*100)+'%':'—'],
+    ['🏆','花得最多',top.length?top.map(([k,v])=>k+' '+fmtMoney(v)).join(' · '):'—'],
+    ['🏃','运动',sp.length?sp.length+' 次 · '+spMin+' 分钟':'—'],
+    ['✅','任务完成',doneTasks+' 项'],
+    ['✈️','旅行',tr.length?tr.map(t=>t.dest).join('、'):'没有出行']
+  ];
+  lastReport={y:y,mo:mo,rows:rows};
+  $('#reportCard').innerHTML='<div style="border-radius:18px;padding:16px 14px;background:linear-gradient(160deg,#241a35,#1a1426);border:1px solid rgba(255,111,181,.35)">'
+    +'<div style="font-size:15px;font-weight:700;color:#FF6FB5">Yichiの工作台 · 月度报告</div>'
+    +'<div style="font-size:12px;color:rgba(245,238,248,.55);margin:2px 0 10px">'+y+' 年 '+mo+' 月</div>'
+    +rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed rgba(255,255,255,.10);font-size:13px"><span style="color:rgba(245,238,248,.75);flex:none">'+r[0]+' '+r[1]+'</span><b style="text-align:right;color:#F5EEF8">'+esc(r[2])+'</b></div>').join('')
+    +'<div style="font-size:11px;color:rgba(245,238,248,.45);margin-top:10px">生成于 '+todayStr()+' · 继续加油 🎀</div></div>';
+  openSheet('sheet-report');
+}
+$('#reportBtn').onclick=buildReport;
+$('#reportSave').onclick=()=>{
+  if(!lastReport)return;
+  const R=lastReport,W=750,H=160+R.rows.length*64+70;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const x=cv.getContext('2d');
+  x.fillStyle='#151020';x.fillRect(0,0,W,H);
+  x.fillStyle='#FF6FB5';x.font='bold 34px sans-serif';x.fillText('Yichiの工作台 · 月度报告',40,72);
+  x.fillStyle='rgba(245,238,248,.55)';x.font='24px sans-serif';x.fillText(R.y+' 年 '+R.mo+' 月',40,110);
+  let yy=150;
+  R.rows.forEach(r=>{
+    x.strokeStyle='rgba(255,255,255,.12)';x.beginPath();x.moveTo(40,yy);x.lineTo(W-40,yy);x.stroke();
+    x.fillStyle='rgba(245,238,248,.75)';x.font='26px sans-serif';x.fillText(r[0]+' '+r[1],40,yy+42);
+    x.fillStyle='#F5EEF8';x.font='bold 26px sans-serif';
+    const val=String(r[2]);let tw=x.measureText(val).width;
+    if(tw>W-340){x.font='bold 20px sans-serif';tw=x.measureText(val).width}
+    x.fillText(val,W-40-tw,yy+42);
+    yy+=64;
+  });
+  x.fillStyle='rgba(245,238,248,.45)';x.font='20px sans-serif';x.fillText('生成于 '+todayStr()+' · 继续加油 🎀',40,H-30);
+  const a=document.createElement('a');a.download='Yichi月度报告-'+ledMonth+'.png';a.href=cv.toDataURL('image/png');
+  document.body.appendChild(a);a.click();a.remove();
+  toast('报告图已保存');
+};
 
 /* ================= 数据备份（JSON 导出 / 导入） ================= */
 $('#bkExport').onclick=()=>{
   const data={app:'Yichi工作台',ver:1,exported:new Date().toISOString(),
     tasks,ledger,trips,sports,work,pantry,geoMan,rec:recData,budget:+store.get('wb.budget',0)||0,
-    deposits,depGoal:+store.get('wb.depGoal',0)||0};
+    deposits,depGoal:+store.get('wb.depGoal',0)||0,shop};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -2469,18 +2683,20 @@ $('#bkFile').addEventListener('change',async e=>{
   if(typeof d.budget==='number'){store.set('wb.budget',d.budget)}
   if(Array.isArray(d.deposits)){deposits=d.deposits;saveDeps()}
   if(typeof d.depGoal==='number'){store.set('wb.depGoal',d.depGoal)}
-  renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderDeposit();renderSub();
+  if(Array.isArray(d.shop)){shop=d.shop;saveShop()}
+  renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderDeposit();renderShop();renderSub();
   closeSheets();toast('导入完成 · 数据已恢复');
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.14.1';
+const WB_VER='1.15.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
 $$('.mod').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 buildLedCats();buildSpCats();buildWkCats();
-renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderDeposit();
+bootRecur();
+renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderDeposit();renderShop();
 switchTab(META[location.hash.slice(1)]?location.hash.slice(1):'tasks');
 Sync.init();   /* 启动混合存储层：未配置 Supabase 且无 iCloud 插件时自动降级为纯本地模式 */
 </script>
