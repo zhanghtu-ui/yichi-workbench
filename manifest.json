@@ -1,7 +1,7 @@
 {
   "name": "Yichiの工作台",
   "short_name": "Yichiの工作台",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#151020",
