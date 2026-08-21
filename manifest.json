@@ -1,14 +1,29 @@
 {
   "name": "Yichiの工作台",
   "short_name": "Yichiの工作台",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#151020",
   "theme_color": "#151020",
   "icons": [
-    { "src": "k3-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "k3-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "k3-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "k3-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "k3-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "k3-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
