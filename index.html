@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=18">
+<link rel="manifest" href="manifest.json?v=19">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -989,7 +989,7 @@ function renderSub(){
       const days=Math.round((dOnly(up[0].start)-dOnly(todayStr()))/864e5);
       cd=' · '+(days<=0?'今天出发':days+' 天后出发');
     }
-    {const gc=geoCounts();el.textContent=`旅行 · 已点亮 ${gc.nC} 国 · ${gc.nP} 省 · ${gc.nT} 城 · ${trips.filter(t=>tripStatus(t)!=='ended').length} 个计划${cd}`;}
+    {const gc=geoCounts(),cx=geoCustomPoints().length;el.textContent=`旅行 · 已点亮 ${gc.nC} 国 · ${gc.nP} 省 · ${gc.nT} 城`+(cx?` · +${cx} 自定义`:'')+` · ${trips.filter(t=>tripStatus(t)!=='ended').length} 个计划${cd}`;}
   }else if(curTab==='work'){
     el.textContent=`工作 · ${work.filter(w=>!w.done).length} 项进行中 · ${work.filter(w=>!w.done&&w.pri==='高').length} 项高优`;
   }else if(curTab==='menu'){
@@ -1455,6 +1455,32 @@ function geoCounts(){
   const vis=visitedSet();
   return {nC:GEO_COUNTRIES.filter(c=>vis.has(c.k)).length,nP:GEO_PROVS.filter(p=>vis.has(p.k)).length,nT:GEO_CITIES.filter(c=>vis.has(c.k)).length};
 }
+function catalogHit(d){
+  return GEO_COUNTRIES.some(c=>d.includes(c.k)||(GEO_ALIAS[c.k]||[]).some(a=>d.includes(a)))
+    ||GEO_PROVS.some(p=>d.includes(p.k)||(p.a||[]).some(a=>d.includes(a)))
+    ||GEO_CITIES.some(ci=>d.includes(ci.k));
+}
+function geoCustomPoints(){
+  const out=[],seen=new Set();
+  trips.forEach(t=>{
+    const st=tripStatus(t);if(st!=='ended'&&st!=='ongoing')return;
+    const d=(t.dest||'').trim();if(!d||seen.has(d))return;seen.add(d);
+    if(catalogHit(d))return;
+    if(!(d in geoNameCache)){
+      geoNameCache[d]=null;store.set('wb.geoNameCache',geoNameCache);
+      fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(d)+'&count=1&language=zh&format=json')
+        .then(r=>r.json()).then(j=>{
+          const r0=j&&j.results&&j.results[0];
+          geoNameCache[d]=r0?{lat:r0.latitude,lon:r0.longitude}:false;
+          store.set('wb.geoNameCache',geoNameCache);renderGeo();renderTravel();
+        }).catch(()=>{});
+      return;
+    }
+    const g=geoNameCache[d];
+    if(g&&g.lat!==undefined)out.push({k:d,c:[g.lat,g.lon]});
+  });
+  return out;
+}
 if(!store.get('wb.geoMig',0)){
   geoMan=geoMan.flatMap(n=>GEO_LEGACY[n]||[n]).filter((n,i,a)=>a.indexOf(n)===i);
   store.set('wb.geoMig',1);saveGeo();
@@ -1504,7 +1530,8 @@ function geoZoomAt(cx,cy,f){
 function renderGeo(){
   const vis=visitedSet();
   const gc=geoCounts();
-  $('#geoStats').textContent=`已点亮 ${gc.nC} 国 · ${gc.nP} 省 · ${gc.nT} 城`;
+  const customs=geoCustomPoints();
+  $('#geoStats').textContent=`已点亮 ${gc.nC} 国 · ${gc.nP} 省 · ${gc.nT} 城`+(customs.length?` · +${customs.length} 自定义`:'');
   const dot=(p,r)=>{const[x,y]=geoXY(p.c);return `<circle class="gm lit" data-cr="${r}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/>`};
   const cityG=(c,lit)=>{const[x,y]=geoXY(c.c);return `<g class="gm-city${lit?' on':''}" data-cx="${x.toFixed(1)}" data-cy="${y.toFixed(1)}"><circle class="gm${lit?' lit':''}" data-cr="${lit?3.5:2.6}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${lit?3.5:2.6}"/><text class="gm-lbl${lit?'':' off'}" x="${(x+6).toFixed(1)}" y="${(y+3.5).toFixed(1)}">${esc(c.k)}</text></g>`};
   $('#geoMap').innerHTML=`<svg id="geoSvg" viewBox="0 0 720 360" role="img" aria-label="世界地图">
@@ -1515,10 +1542,11 @@ function renderGeo(){
     <g id="geoCN" style="display:none"><path class="geo-prov" d="${CN_PROV}"/></g>
     ${GEO_COUNTRIES.filter(c=>vis.has(c.k)).map(c=>dot(c,4.5)).join('')}
     ${GEO_PROVS.filter(p=>vis.has(p.k)).map(p=>dot(p,4.5)).join('')}
-    <g id="geoCityG" style="display:none">${GEO_CITIES.filter(c=>vis.has(c.k)).map(c=>cityG(c,1)).join('')}${GEO_CITIES.filter(c=>!vis.has(c.k)).map(c=>cityG(c,0)).join('')}</g>
+    ${customs.map(c=>dot(c,4.5)).join('')}
+    <g id="geoCityG" style="display:none">${GEO_CITIES.filter(c=>vis.has(c.k)).map(c=>cityG(c,1)).join('')}${customs.map(c=>cityG(c,1)).join('')}${GEO_CITIES.filter(c=>!vis.has(c.k)).map(c=>cityG(c,0)).join('')}</g>
   </svg>`;
   applyGeoView();
-  const litList=[...GEO_COUNTRIES.filter(c=>vis.has(c.k)),...GEO_PROVS.filter(p=>vis.has(p.k)),...GEO_CITIES.filter(c=>vis.has(c.k))].map(x=>x.k);
+  const litList=[...GEO_COUNTRIES.filter(c=>vis.has(c.k)),...GEO_PROVS.filter(p=>vis.has(p.k)),...GEO_CITIES.filter(c=>vis.has(c.k))].map(x=>x.k).concat(customs.map(c=>c.k));
   $('#geoArch').innerHTML=litList.length
     ?litList.map(k=>`<span class="arch-chip">✓ ${esc(k)}</span>`).join('')
     :'<span class="arch-chip" style="opacity:.5">还没有足迹，完成一次旅行就会自动点亮</span>';
@@ -1649,7 +1677,9 @@ function renderTravel(){
     </div>`:'';
     let memoHtml='';
     if(st==='ended'){
-      const places=tripMemoPlaces(t.dest);
+      let places=tripMemoPlaces(t.dest);
+      const gcm=geoNameCache[t.dest];
+      if(!places.length&&gcm&&gcm.lat!==undefined)places=[t.dest];
       memoHtml=`<div class="trip-note" style="border:1px dashed rgba(255,111,181,.35);border-radius:12px;padding:8px 10px">📸 旅行回忆 · ${tripDur(t)} 天${places.length?' · 点亮 '+places.join('、'):''}</div>`;
     }
     return `
@@ -3084,7 +3114,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.18.0';
+const WB_VER='1.19.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
