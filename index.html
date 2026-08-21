@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=16">
+<link rel="manifest" href="manifest.json?v=17">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -513,6 +513,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <!-- ========== 倒数日 ========== -->
   <section class="page" id="page-events">
     <div id="evNext"></div>
+    <div id="evHoli" style="margin-top:16px"></div>
     <div class="geo-region" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
       <span>全部倒数日</span>
       <span class="geo-stats" id="evCount"></span>
@@ -1029,6 +1030,8 @@ function renderToday(){
   }
   const evN=evNearest(today);
   if(evN)rows.push({tab:'events',ic:evN.icon||'🎂',tx:evN.title,val:evN.days===0?'今天 🎉':evN.days>0?evN.days+' 天后':'已过 '+(-evN.days)+' 天'});
+  const bh=beNext(today);
+  if(bh)rows.push({tab:'events',ic:'🇧🇪',tx:'假期 '+bh.title,val:bh.days===0?'今天 🎉':bh.days+' 天后'});
   const can=dishCalc().filter(x=>!x.miss.length);
   rows.push({tab:'menu',ic:'🍳',tx:'现在可做',val:can.length+' 道菜'});
   const fire=taskStreak();
@@ -2811,7 +2814,7 @@ function renderEvents(){
     <div class="card pad" style="text-align:center;padding:22px 16px">
       <div style="font-size:36px">${nxt.icon||'🎂'}</div>
       <div style="font-size:17px;font-weight:800;margin-top:6px">${esc(nxt.title)}</div>
-      <div style="font-size:12px;color:var(--label2);margin-top:3px">${cnDate(nxt.date)}${nxt.yearly?' · 每年':''}</div>
+      <div style="font-size:12px;color:var(--label2);margin-top:3px">${cnFull(nxt.date)}${nxt.yearly?' · 每年':''}</div>
       <div style="font-size:26px;font-weight:800;color:var(--sky);margin-top:8px">${nxt.days===0?'今天 🎉':nxt.days>0?'还有 '+nxt.days+' 天':'已度过 '+(-nxt.days)+' 天'}</div>
     </div>`
     :'<div class="empty"><div class="big">🎂</div>添加生日 / 纪念日，最近的会置顶在这里</div>';
@@ -2821,11 +2824,12 @@ function renderEvents(){
       <div class="cat-ic in">${ev.icon||'🎂'}</div>
       <div class="led-info">
         <div class="led-cat">${esc(ev.title)}</div>
-        <div class="led-note">${cnDate(ev.date)}${ev.yearly?' · 每年':''}</div>
+        <div class="led-note">${cnFull(ev.date)}${ev.yearly?' · 每年':''}</div>
       </div>
       <span class="wk-badge ${ev.days<=0?'ok':'miss'}">${ev.days===0?'今天 🎉':ev.days>0?ev.days+' 天':'已过 '+(-ev.days)+' 天'}</span>
       <button class="icon-btn" data-act="ev-del">${TRASH}</button>
     </div></div>`).join('');
+  renderHolidays();
   if(curTab==='events')renderSub();
 }
 $('#evList').addEventListener('click',e=>{
@@ -2862,6 +2866,54 @@ $('#evSave').onclick=()=>{
   }
   saveEvents();renderEvents();closeSheets();toast('已保存 🎂');
 };
+
+/* ---- 比利时法定节假日（复活节按 computus 逐年推算，免硬编码） ---- */
+function easterDate(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da)}
+function beHolidays(y){
+  const dt=n=>{const x=easterDate(y);x.setDate(x.getDate()+n);return dateKey(x)};
+  return [
+    {date:y+'-01-01',title:'元旦',icon:'🎆'},
+    {date:dt(1),title:'复活节星期一',icon:'🐣'},
+    {date:y+'-05-01',title:'劳动节',icon:'🛠️'},
+    {date:dt(39),title:'耶稣升天节',icon:'🕊️'},
+    {date:dt(50),title:'圣灵降临节星期一',icon:'🌿'},
+    {date:y+'-07-21',title:'比利时国庆日',icon:'🇧🇪'},
+    {date:y+'-08-15',title:'圣母升天节',icon:'⛪'},
+    {date:y+'-11-01',title:'诸圣节',icon:'🕯️'},
+    {date:y+'-11-11',title:'停战纪念日',icon:'🎗️'},
+    {date:y+'-12-25',title:'圣诞节',icon:'🎄'}
+  ];
+}
+function beWithDays(y,today){return beHolidays(y).map(h=>Object.assign({},h,{days:Math.round((dOnly(h.date)-dOnly(today))/864e5)}))}
+function beNext(today){
+  let up=beWithDays(+today.slice(0,4),today).filter(h=>h.days>=0);
+  if(!up.length)up=beWithDays(+today.slice(0,4)+1,today).filter(h=>h.days>=0);
+  return up[0]||null;
+}
+let holiOpen=true;
+function renderHolidays(){
+  const today=todayStr();let year=+today.slice(0,4),list=beWithDays(year,today);
+  if(!list.some(h=>h.days>=0)){year++;list=beWithDays(year,today)}
+  const nxt=list.filter(h=>h.days>=0)[0];
+  $('#evHoli').innerHTML=`
+    <div class="card pad" style="padding:12px 14px">
+      <div class="pack-head${holiOpen?' open':''}" data-act="holi-toggle" style="margin:0">
+        <span class="arr">▸</span><span>🇧🇪 比利时法定节假日 · ${year}</span><span class="pack-n">${list.length} 个</span>
+      </div>
+      ${nxt?`<div style="display:flex;align-items:center;gap:10px;background:rgba(255,111,181,.08);border:1px solid rgba(255,111,181,.25);border-radius:12px;padding:10px 12px;margin-top:6px">
+        <span style="font-size:24px">${nxt.icon}</span>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">下一个假期 · ${esc(nxt.title)}</div><div style="font-size:11px;color:var(--label2);margin-top:1px">${cnFull(nxt.date)}</div></div>
+        <span style="font-size:17px;font-weight:800;color:var(--sky)">${nxt.days===0?'今天 🎉':nxt.days+' 天'}</span>
+      </div>`:''}
+      ${holiOpen?list.map(h=>`
+      <div class="row" style="${h.days<0?'opacity:.45':''}">
+        <div class="cat-ic in">${h.icon}</div>
+        <div class="led-info"><div class="led-cat">${esc(h.title)}</div><div class="led-note">${cnFull(h.date)}</div></div>
+        <span class="wk-badge ${h.days<=0?'ok':'miss'}">${h.days===0?'今天 🎉':h.days>0?h.days+' 天':'已过 '+(-h.days)+' 天'}</span>
+      </div>`).join(''):''}
+    </div>`;
+}
+$('#evHoli').addEventListener('click',e=>{if(e.target.closest('[data-act="holi-toggle"]')){holiOpen=!holiOpen;renderHolidays()}});
 
 /* ================= 天气（open-meteo · 免 key · 离线降级） ================= */
 const WMO={0:['☀️','晴'],1:['🌤️','晴间多云'],2:['⛅','多云'],3:['☁️','阴'],45:['🌫️','雾'],48:['🌫️','雾'],51:['🌦️','小雨'],53:['🌦️','雨'],55:['🌧️','大雨'],61:['🌧️','小雨'],63:['🌧️','雨'],65:['🌧️','大雨'],71:['🌨️','小雪'],73:['❄️','雪'],75:['❄️','大雪'],80:['🌦️','阵雨'],81:['🌧️','阵雨'],82:['⛈️','强阵雨'],95:['⛈️','雷雨'],96:['⛈️','雷雨'],99:['⛈️','雷雨']};
@@ -2936,8 +2988,9 @@ $('#searchInput').addEventListener('input',()=>{
   if(g2.length)groups.push(['💶','记账','ledger',g2.map(r=>[cnDate(r.date)+' · '+r.cat+(r.note?' · '+r.note:''),(r.type==='expense'?'-':'+')+fmtMoney(r.amount)])]);
   const g3=trips.filter(t=>hit(t.dest)||hit(t.note)).slice(0,4);
   if(g3.length)groups.push(['✈️','旅行','travel',g3.map(t=>[t.dest,cnDate(t.start)+' – '+cnDate(t.end)])]);
-  const g4=events.filter(x=>hit(x.title)).slice(0,4);
-  if(g4.length)groups.push(['🎂','倒数日','events',g4.map(x=>[x.title,cnDate(x.date)+(x.yearly?' · 每年':'')])]);
+  const g4=events.filter(x=>hit(x.title)).slice(0,4).map(x=>[x.title,cnFull(x.date)+(x.yearly?' · 每年':'')]);
+  const g4h=beWithDays(+todayStr().slice(0,4),todayStr()).filter(h=>h.days>=0&&hit(h.title)).slice(0,3).map(h=>[h.icon+' '+h.title,cnFull(h.date)+' 🇧🇪']);
+  if(g4.length||g4h.length)groups.push(['🎂','倒数日','events',g4.concat(g4h).slice(0,5)]);
   const mRows=pantry.filter(p=>hit(p)).map(p=>['食材 · '+p,'']).concat(RECIPES.filter(r=>hit(r[0])).map(r=>['菜谱 · '+r[1]+' '+r[0],'']));
   if(mRows.length)groups.push(['🍳','菜单','menu',mRows.slice(0,5)]);
   const g6=shop.filter(s=>hit(s.txt)).slice(0,4);
@@ -2992,7 +3045,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.16.0';
+const WB_VER='1.17.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
