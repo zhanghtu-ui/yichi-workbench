@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=22">
+<link rel="manifest" href="manifest.json?v=23">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -691,7 +691,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <div class="field"><label>金额（€）</label>
       <input id="dpAmount" class="amount-input" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0.00">
     </div>
-    <div class="field"><label>来源</label><div class="chips" id="dpCats"></div></div>
+    <div class="field"><label>类目</label><div class="chips" id="dpCats"></div></div>
     <div class="field"><label>账户</label><div class="chips" id="dpAccPick"></div></div>
     <div class="field"><label>日期</label><input id="dpDate" type="date"><div class="chips" id="dpDateQuick" style="margin-top:8px"></div></div>
     <div class="field"><label>备注</label><input id="dpNote" type="text" placeholder="选填" maxlength="40"></div>
@@ -712,6 +712,23 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <div class="field"><label>新建账户</label>
       <div class="chips" id="accmIcs"></div>
       <div class="todo-add" style="margin-top:8px"><input id="accmName" class="todo-input" type="text" maxlength="10" placeholder="账户名，如 妈妈 / 共同基金"><button class="mini-add" id="accmAdd">＋</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- 类目管理弹窗 -->
+<div class="sheet" id="sheet-catm">
+  <div class="handle"></div>
+  <div class="sheet-head">
+    <button class="cancel">取消</button>
+    <span class="title">存款类目管理</span>
+    <span style="width:44px"></span>
+  </div>
+  <div class="sheet-body">
+    <div id="catmList"></div>
+    <div class="field"><label>新建类目</label>
+      <div class="chips" id="catmIcs"></div>
+      <div class="todo-add" style="margin-top:8px"><input id="catmName" class="todo-input" type="text" maxlength="10" placeholder="类目名，如 利息 / 副业"><button class="mini-add" id="catmAdd">＋</button></div>
     </div>
   </div>
 </div>
@@ -1356,7 +1373,7 @@ $('#budgetLine').addEventListener('click',e=>{
     const left=+(b-out).toFixed(2);
     if(left<=0){toast('本月没有结余');return}
     const date=ledMonth===todayStr().slice(0,7)?todayStr():lastDayOf(ledMonth);
-    deposits.push({id:uid(),date:date,amt:left,cat:'预算结余',note:(+ledMonth.slice(5))+'月预算结余',created:Date.now(),_ut:Date.now()});
+    deposits.push({id:uid(),date:date,amt:left,cat:(depCats.some(c=>c.name==='预算结余')?'预算结余':depCats[0].name),note:(+ledMonth.slice(5))+'月预算结余',created:Date.now(),_ut:Date.now()});
     saveDeps();renderDeposit();renderSub();renderLedger();
     toast('结余 '+fmtMoney(left)+' 已存入 🐷');
     return;
@@ -2196,9 +2213,9 @@ function enableSwipeDel(sel){
      表结构见 supabase_schema.sql；留空可退回本地 / iCloud 模式。 */
 const WB_CONFIG=Object.assign({SUPABASE_URL:'https://flupnwmpsshkrbfrjofl.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_1P-PNnwKyulHVfFl_XXc9g_5CrIk-A-'},window.__WB_CFG||{});
 
-const SYNC_KEYS={'wb.tasks':'tasks','wb.ledger':'ledger','wb.trips':'travel','wb.sports':'sport','wb.work':'work','wb.pantry':'menu','wb.deposits':'deposit','wb.depAccs':'deposit','wb.shop':'shop','wb.events':'events'};
+const SYNC_KEYS={'wb.tasks':'tasks','wb.ledger':'ledger','wb.trips':'travel','wb.sports':'sport','wb.work':'work','wb.pantry':'menu','wb.deposits':'deposit','wb.depAccs':'deposit','wb.depCats':'depcats','wb.shop':'shop','wb.events':'events'};
 /* 内存数组是 UI 的唯一数据源；同步层直接读写这些引用，避免与 localStorage 解析副本脱节 */
-const ARR=()=>({'wb.tasks':tasks,'wb.ledger':ledger,'wb.trips':trips,'wb.sports':sports,'wb.work':work,'wb.pantry':pantry,'wb.deposits':deposits,'wb.depAccs':depAccs,'wb.shop':shop,'wb.events':events});
+const ARR=()=>({'wb.tasks':tasks,'wb.ledger':ledger,'wb.trips':trips,'wb.sports':sports,'wb.work':work,'wb.pantry':pantry,'wb.deposits':deposits,'wb.depAccs':depAccs,'wb.depCats':depCats,'wb.shop':shop,'wb.events':events});
 
 /* ---- Supabase 后端（主数据源：邮箱认证 + records CRUD） ---- */
 const SbBackend={
@@ -2423,6 +2440,7 @@ const Sync={
           if(v===null)continue;
           if(k==='wb.depAccs'&&!(typeof v.name==='string'&&v.name))continue;   /* 防存款记录串入账户列表 */
           if(k==='wb.deposits'&&!(typeof v.date==='string'&&v.amt!==undefined))continue;   /* 防账户对象串入存款列表 */
+          if(k==='wb.depCats'&&!(typeof v.name==='string'&&v.name))continue;   /* 类目形状校验 */
           if(exist){const i=local.findIndex(it=>this.itemKey(it,k)===r.id);if(i>-1)local[i]=v;else local.push(v)}
           else local.push(v);
           map[r.id]={id:r.id,payload:r.payload,createdAt:r.createdAt||0,updatedAt:r.updatedAt};
@@ -2561,14 +2579,19 @@ if(Array.isArray(depAccs)){const n0=depAccs.length;depAccs=depAccs.filter(a=>a&&
 if(!Array.isArray(depAccs)||!depAccs.length){depAccs=[{id:'a0',name:'我的存款',ic:'🐷'}];store.set('wb.depAccs',depAccs)}
 const saveAccs=()=>store.set('wb.depAccs',depAccs);
 if(deposits.some(r=>!r.acc)){deposits.forEach(r=>{if(!r.acc)r.acc='a0'});saveDeps()}
-const ACC_ICS=['🐷','💰','👛','🏦','🎓','🎯','🏠','✈️','👶','🐱','🎁','💍'];
+const ACC_ICS=['🐷','💰','👛','🏦','🎓','🎯','🏠','✈️','👶','🐱','🎁','💍','👦','👧'];
 let depAccF='all',depAccSel='a0';
 const accOf=id=>depAccs.find(a=>a.id===id);
 const depsAll=()=>deposits;
 const depF=()=>depAccF==='all'?deposits:deposits.filter(r=>r.acc===depAccF);
-const DEP_CATS=[['工资结余','💼'],['理财收益','📈'],['年终奖','🎁'],['红包','🧧'],['兼职','🧾'],['预算结余','🎯'],['其他','✨']];
-const depCatIc=n=>{const c=DEP_CATS.find(x=>x[0]===n);return c?c[1]:'✨'};
-let editingDepId=null,depCat=DEP_CATS[0][0];
+const CAT_DEFAULTS=[['工资结余','💼'],['理财收益','📈'],['年终奖','🎁'],['红包','🧧'],['兼职','🧾'],['预算结余','🎯'],['其他','✨']];
+let depCats=store.get('wb.depCats',null);
+if(Array.isArray(depCats)){const n0=depCats.length;depCats=depCats.filter(c=>c&&typeof c.name==='string'&&c.name);depCats.forEach(c=>{if(typeof c.ic!=='string'||!c.ic)c.ic='✨';if(typeof c.id!=='string'||!c.id)c.id=uid()});if(depCats.length!==n0)store.set('wb.depCats',depCats)}
+if(!Array.isArray(depCats)||!depCats.length){depCats=CAT_DEFAULTS.map((x,i)=>({id:'c'+i,name:x[0],ic:x[1]}));store.set('wb.depCats',depCats)}
+const saveCats=()=>store.set('wb.depCats',depCats);
+const CAT_ICS=['💼','📈','🎁','🧧','🧾','🎯','✨','💰','🎓','✈️','🏠','🛍️','👦','👧'];
+let editingDepId=null,depCat=depCats[0].name;
+const depCatIc=n=>{const c=depCats.find(x=>x.name===n);return c?c.ic:'✨'};
 const depTotal=()=>deposits.reduce((a,b)=>a+ +b.amt,0);
 const depMonthSum=mk=>deposits.filter(r=>r.date.startsWith(mk)).reduce((a,b)=>a+ +b.amt,0);
 function renderDeposit(){
@@ -2616,10 +2639,10 @@ function renderDeposit(){
   if(g>0&&depTotal()>=g&&+store.get('wb.depCeleb',0)!==g){
     store.set('wb.depCeleb',g);confetti();toast('存款目标达成 🎉');
   }
-  /* 按来源年小计 */
+  /* 按类目年小计 */
   const yr=m.slice(0,4),ysum={};
   deposits.filter(r=>r.date.startsWith(yr)).forEach(r=>{ysum[r.cat]=(ysum[r.cat]||0)+ +r.amt});
-  $('#depYearSum').innerHTML='<span style="font-size:12px;color:var(--label2);margin-right:2px">'+yr+' 年 · 按来源</span>'
+  $('#depYearSum').innerHTML='<span style="font-size:12px;color:var(--label2);margin-right:2px">'+yr+' 年 · 按类目</span>'
     +Object.entries(ysum).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<span class="chip on" style="pointer-events:none">'+depCatIc(k)+' '+esc(k)+' '+fmtMoney(v)+'</span>').join('');
   /* 列表：按月分组 */
   const rows=deposits.slice().sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:(b.created||0)-(a.created||0));
@@ -2678,8 +2701,8 @@ function openDepSheet(r){
   editingDepId=r?r.id:null;
   $('#dpTitle').textContent=r?'编辑存款':'记一笔存款';
   $('#dpAmount').value=r?String(r.amt).replace('.',','):'';
-  depCat=r?r.cat:DEP_CATS[0][0];
-  $$('#dpCats .chip').forEach(x=>x.classList.toggle('on',x.dataset.v===depCat));
+  depCat=r?r.cat:depCats[0].name;
+  renderDepCats();
   $('#dpDate').value=r?r.date:todayStr();
   $('#dpNote').value=r?(r.note||''):'';
   $('#dpAccPick').innerHTML=depAccs.map(a=>`<button class="chip" data-v="${a.id}">${a.ic} ${esc(a.name)}</button>`).join('');
@@ -2735,10 +2758,68 @@ $('#accmList').addEventListener('click',e=>{
     saveAccs();saveDeps();renderAccm();renderDeposit();toast('已删除并合并');
   }
 });
+function renderDepCats(){
+  let list=depCats;
+  if(depCat&&!depCats.some(c=>c.name===depCat))list=[{id:'_g',name:depCat,ic:depCatIc(depCat)}].concat(depCats);
+  $('#dpCats').innerHTML=list.map(c=>`<button class="chip${c.name===depCat?' on':''}" data-v="${esc(c.name)}">${c.ic} ${esc(c.name)}</button>`).join('')+`<button class="chip" data-v="__m" aria-label="管理类目">⚙️</button>`;
+}
+let catmIc=CAT_ICS[0];
+function renderCatm(){
+  $('#catmIcs').innerHTML=CAT_ICS.map(i=>`<button class="chip${i===catmIc?' on':''}" data-v="${i}">${i}</button>`).join('');
+  $('#catmList').innerHTML=depCats.map(c=>{
+    const n=deposits.filter(r=>r.cat===c.name).length;
+    return `<div class="row" data-id="${c.id}">
+      <div class="cat-ic in" data-act="cyc">${c.ic}</div>
+      <div class="led-info">
+        <div class="led-cat">${esc(c.name)}</div>
+        <div class="led-note">${n} 笔记录</div>
+      </div>
+      <button class="icon-btn" data-act="ren" aria-label="改名">✏️</button>
+      <button class="icon-btn" data-act="del" aria-label="删除">${TRASH}</button>
+    </div>`;
+  }).join('');
+}
+$('#catmIcs').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  catmIc=c.dataset.v;
+  $$('#catmIcs .chip').forEach(x=>x.classList.toggle('on',x===c));
+});
+$('#catmAdd').onclick=()=>{
+  const name=($('#catmName').value||'').trim();
+  if(!name){toast('先起个类目名');return}
+  if(depCats.some(c=>c.name===name)){toast('已有同名类目');return}
+  depCats.push({id:uid(),name:name,ic:catmIc});
+  saveCats();$('#catmName').value='';renderCatm();renderDepCats();toast('已添加 '+catmIc+' '+name);
+};
+$('#catmList').addEventListener('click',e=>{
+  const row=e.target.closest('.row');if(!row)return;
+  const act=e.target.closest('[data-act]');if(!act)return;
+  const c=depCats.find(x=>x.id===row.dataset.id);if(!c)return;
+  if(act.dataset.act==='cyc'){const i=CAT_ICS.indexOf(c.ic);c.ic=CAT_ICS[(i+1)%CAT_ICS.length];saveCats();renderCatm();renderDepCats()}
+  else if(act.dataset.act==='ren'){
+    const n=(prompt('类目改名：',c.name)||'').trim();
+    if(!n||n===c.name)return;
+    if(depCats.some(x=>x.name===n)){toast('已有同名类目');return}
+    const old=c.name;c.name=n;
+    deposits.forEach(r=>{if(r.cat===old){r.cat=n;r._ut=Date.now()}});
+    if(depCat===old)depCat=n;
+    saveCats();saveDeps();renderCatm();renderDepCats();renderDeposit();toast('已改名');
+  }else if(act.dataset.act==='del'){
+    if(depCats.length<=1){toast('至少保留一个类目');return}
+    const n=deposits.filter(r=>r.cat===c.name).length;
+    const tgt=depCats.find(x=>x.id!==c.id);
+    if(!confirm('删除类目「'+c.name+'」？'+(n?'该类目下 '+n+' 笔记录将归入「'+tgt.name+'」':'')))return;
+    deposits.forEach(r=>{if(r.cat===c.name){r.cat=tgt.name;r._ut=Date.now()}});
+    depCats=depCats.filter(x=>x.id!==c.id);
+    if(depCat===c.name)depCat=depCats[0].name;
+    saveCats();saveDeps();renderCatm();renderDepCats();renderDeposit();toast('已删除并合并');
+  }
+});
 $('#dpCats').addEventListener('click',e=>{
   const c=e.target.closest('.chip');if(!c)return;
-  $$('#dpCats .chip').forEach(x=>x.classList.toggle('on',x===c));
+  if(c.dataset.v==='__m'){renderCatm();openSheet('sheet-catm');return}
   depCat=c.dataset.v;
+  $$('#dpCats .chip').forEach(x=>x.classList.toggle('on',x===c));
 });
 $('#dpAccPick').addEventListener('click',e=>{
   const c=e.target.closest('.chip');if(!c)return;
@@ -2766,7 +2847,6 @@ $('#dpSave').onclick=()=>{
   saveDeps();renderDeposit();renderSub();
   closeSheets();
 };
-$('#dpCats').innerHTML=DEP_CATS.map((c,i)=>`<button class="chip${i===0?' on':''}" data-v="${c[0]}">${c[1]} ${c[0]}</button>`).join('');
 dateQuick('#dpDateQuick','#dpDate');
 const lastDayOf=mk=>{const y=+mk.slice(0,4),mo=+mk.slice(5);return mk+'-'+pad(new Date(y,mo,0).getDate())};
 /* 达标庆祝彩带 */
@@ -3136,7 +3216,7 @@ $('#searchRes').addEventListener('click',e=>{
 $('#bkExport').onclick=()=>{
   const data={app:'Yichi工作台',ver:1,exported:new Date().toISOString(),
     tasks,ledger,trips,sports,work,pantry,geoMan,rec:recData,budget:+store.get('wb.budget',0)||0,
-    deposits,depAccs,depGoal:+store.get('wb.depGoal',0)||0,shop,events};
+    deposits,depAccs,depCats,depGoal:+store.get('wb.depGoal',0)||0,shop,events};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -3165,6 +3245,7 @@ $('#bkFile').addEventListener('change',async e=>{
   if(typeof d.budget==='number'){store.set('wb.budget',d.budget)}
   if(Array.isArray(d.deposits)){deposits=d.deposits;saveDeps()}
   if(Array.isArray(d.depAccs)&&d.depAccs.length){depAccs=d.depAccs;saveAccs()}
+  if(Array.isArray(d.depCats)&&d.depCats.length){const nc=d.depCats.filter(c=>c&&typeof c.name==='string'&&c.name);if(nc.length){depCats=nc;saveCats()}}
   if(deposits.some(r=>!r.acc)){deposits.forEach(r=>{if(!r.acc)r.acc=depAccs[0].id});saveDeps()}
   if(typeof d.depGoal==='number'){store.set('wb.depGoal',d.depGoal)}
   if(Array.isArray(d.shop)){shop=d.shop;saveShop()}
@@ -3174,7 +3255,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.21.1';
+const WB_VER='1.22.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
