@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=19">
+<link rel="manifest" href="manifest.json?v=20">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -168,9 +168,14 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .geo-title{font-size:16px;font-weight:700}
 .geo-stats{font-size:12px;color:var(--sky-deep);font-weight:600}
 .geo-map{position:relative;margin-top:6px}
-#geoMap{touch-action:none;overflow:hidden;border-radius:10px;background:rgba(21,16,32,.5)}
-#geoMap svg{display:block;width:100%;height:auto;cursor:grab}
-#geoMap svg:active{cursor:grabbing}
+#geoMap{overflow:hidden}
+#geoMap svg{display:block;width:100%;height:auto}
+.geo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.geo-panel{background:rgba(21,16,32,.5);border-radius:10px;padding:8px 8px 6px}
+.gp-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:700;margin-bottom:4px}
+.gp-head .gp-stat{font-size:10px;color:var(--sky-deep);font-weight:600}
+.gp-cn{margin-top:10px}
+.gp-dim{opacity:.55}
 .geo-land{fill:#2E2444;stroke:rgba(255,255,255,.12);stroke-width:.6;vector-effect:non-scaling-stroke}
 .geo-prov{fill:none;stroke:rgba(255,111,181,.45);stroke-width:.7;vector-effect:non-scaling-stroke}
 .gm{fill:none;stroke:rgba(245,238,248,.4);stroke-width:1.1}
@@ -178,9 +183,6 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .gm-lbl{fill:#FFE0F0;font-weight:600;pointer-events:none;white-space:nowrap;paint-order:stroke;stroke:rgba(21,16,32,.85);stroke-linejoin:round}
 .gm-lbl.off{fill:rgba(245,238,248,.8);font-weight:500}
 .gm-city:not(.on){opacity:.42}
-.geo-zoom{position:absolute;right:6px;top:6px;display:flex;flex-direction:column;gap:6px;z-index:2}
-.geo-zoom button{width:30px;height:30px;border-radius:9px;border:none;background:rgba(43,34,56,.9);color:var(--label);font-size:16px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-.geo-zoom button:active{background:var(--sky-tint);color:var(--sky-deep)}
 .geo-tip{font-size:12px;color:var(--label2);text-align:center;margin-top:8px;min-height:15px}
 .geo-arch{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .geo-arch .arch-chip{font-size:12px;font-weight:600;color:var(--sky-deep);background:var(--sky-tint);padding:5px 10px;border-radius:12px}
@@ -428,13 +430,8 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <div class="geo-top"><span class="geo-title">🗺️ 足迹地图</span><span class="geo-stats" id="geoStats"></span></div>
       <div class="geo-map">
         <div id="geoMap"></div>
-        <div class="geo-zoom">
-          <button type="button" id="gzIn" aria-label="放大">＋</button>
-          <button type="button" id="gzOut" aria-label="缩小">－</button>
-          <button type="button" id="gzRe" aria-label="复位">⟲</button>
-        </div>
       </div>
-      <div class="geo-tip" id="geoTip">点亮由旅行记录自动生成 · 拖动平移 · 放大看省份轮廓与热门城市名称</div>
+      <div class="geo-tip" id="geoTip">点亮由旅行记录自动生成 · 世界总览 + 中国独立 + 六大洲板块 · 城市名点亮后自动显示</div>
       <div class="geo-arch" id="geoArch"></div>
     </div>
   </section>
@@ -1433,6 +1430,41 @@ const GEO_COUNTRIES=[{k:"不丹",c:[27.54,90.04]},{k:"东帝汶",c:[-8.8,125.85]
 const GEO_ALIAS={'韩国':['南韩'],'新西兰':['纽西兰'],'捷克':['捷克共和国'],'美国':['美利坚'],'印度尼西亚':['印尼'],'菲律宾':['菲律']};
 const GEO_PROVS=[{k:"北京",c:[39.9,116.4]},{k:"天津",c:[39.13,117.2]},{k:"上海",c:[31.23,121.47]},{k:"重庆",c:[29.56,106.55]},{k:"河北",c:[38.04,114.51],a:["承德", "北戴河", "秦皇岛"]},{k:"山西",c:[37.87,112.55],a:["平遥", "大同", "五台山"]},{k:"内蒙古",c:[40.84,111.75],a:["呼伦贝尔", "鄂尔多斯", "阿拉善"]},{k:"辽宁",c:[41.8,123.43],a:["大连"]},{k:"吉林",c:[43.88,125.32],a:["长白山"]},{k:"黑龙江",c:[45.8,126.53],a:["哈尔滨", "漠河", "雪乡"]},{k:"江苏",c:[32.06,118.8],a:["苏州", "无锡", "南京", "扬州", "周庄"]},{k:"浙江",c:[30.27,120.15],a:["杭州", "宁波", "温州", "乌镇", "西塘", "普陀山", "千岛湖"]},{k:"安徽",c:[31.86,117.28],a:["黄山", "宏村", "九华山"]},{k:"福建",c:[26.07,119.3],a:["厦门", "泉州", "武夷山"]},{k:"江西",c:[28.68,115.86],a:["景德镇", "婺源", "庐山", "三清山"]},{k:"山东",c:[36.65,117.12],a:["青岛", "泰安", "曲阜", "威海", "烟台", "泰山"]},{k:"河南",c:[34.75,113.62],a:["洛阳", "开封", "少林寺", "安阳"]},{k:"湖北",c:[30.59,114.31],a:["宜昌", "神农架", "武当山"]},{k:"湖南",c:[28.23,112.94],a:["张家界", "凤凰", "衡山"]},{k:"广东",c:[23.13,113.26],a:["深圳", "珠海", "潮汕"]},{k:"广西",c:[22.82,108.32],a:["桂林", "阳朔", "北海", "柳州"]},{k:"海南",c:[20.04,110.35],a:["三亚", "万宁"]},{k:"四川",c:[30.57,104.06],a:["成都", "九寨沟", "稻城", "乐山", "都江堰", "峨眉山"]},{k:"贵州",c:[26.65,106.63],a:["西江", "黄果树", "梵净山"]},{k:"云南",c:[24.88,102.83],a:["昆明", "大理", "丽江", "香格里拉", "西双版纳", "腾冲"]},{k:"西藏",c:[29.65,91.14],a:["拉萨", "林芝", "日喀则", "珠峰"]},{k:"陕西",c:[34.34,108.94],a:["西安", "华山"]},{k:"甘肃",c:[36.06,103.83],a:["敦煌", "张掖", "嘉峪关"]},{k:"青海",c:[36.62,101.78],a:["青海湖", "茶卡"]},{k:"宁夏",c:[38.49,106.23],a:["中卫"]},{k:"新疆",c:[43.83,87.62],a:["乌鲁木齐", "喀什", "伊犁", "喀纳斯", "吐鲁番"]},{k:"台湾",c:[25.03,121.57],a:["台北", "高雄", "台中", "花莲", "垦丁", "阿里山"]}];
 const GEO_CITIES=[{k:"东京",c:[35.68,139.69],o:"日本"},{k:"大阪",c:[34.69,135.5],o:"日本"},{k:"京都",c:[35.01,135.77],o:"日本"},{k:"札幌",c:[43.06,141.35],o:"日本"},{k:"奈良",c:[34.68,135.8],o:"日本"},{k:"横滨",c:[35.44,139.63],o:"日本"},{k:"神户",c:[34.69,135.2],o:"日本"},{k:"福冈",c:[33.59,130.4],o:"日本"},{k:"名古屋",c:[35.18,136.91],o:"日本"},{k:"冲绳",c:[26.33,127.8],o:"日本"},{k:"箱根",c:[35.23,139.11],o:"日本"},{k:"首尔",c:[37.57,126.98],o:"韩国"},{k:"釜山",c:[35.18,129.08],o:"韩国"},{k:"济州",c:[33.36,126.53],o:"韩国"},{k:"曼谷",c:[13.76,100.5],o:"泰国"},{k:"清迈",c:[18.79,98.98],o:"泰国"},{k:"普吉",c:[7.88,98.39],o:"泰国"},{k:"芭提雅",c:[12.92,100.88],o:"泰国"},{k:"苏梅",c:[9.51,99.96],o:"泰国"},{k:"甲米",c:[8.09,98.91],o:"泰国"},{k:"吉隆坡",c:[3.14,101.69],o:"马来西亚"},{k:"槟城",c:[5.41,100.34],o:"马来西亚"},{k:"马六甲",c:[2.19,102.25],o:"马来西亚"},{k:"亚庇",c:[5.98,116.07],o:"马来西亚"},{k:"兰卡威",c:[6.35,99.73],o:"马来西亚"},{k:"巴厘",c:[-8.41,115.19],o:"印度尼西亚"},{k:"雅加达",c:[-6.21,106.85],o:"印度尼西亚"},{k:"河内",c:[21.03,105.85],o:"越南"},{k:"胡志明",c:[10.82,106.63],o:"越南"},{k:"岘港",c:[16.05,108.22],o:"越南"},{k:"芽庄",c:[12.25,109.19],o:"越南"},{k:"会安",c:[15.88,108.33],o:"越南"},{k:"暹粒",c:[13.36,103.86],o:"柬埔寨"},{k:"金边",c:[11.56,104.92],o:"柬埔寨"},{k:"马尼拉",c:[14.6,120.98],o:"菲律宾"},{k:"长滩",c:[11.97,121.92],o:"菲律宾"},{k:"宿务",c:[10.32,123.9],o:"菲律宾"},{k:"琅勃拉邦",c:[19.88,102.14],o:"老挝"},{k:"万象",c:[17.97,102.63],o:"老挝"},{k:"蒲甘",c:[21.17,94.86],o:"缅甸"},{k:"仰光",c:[16.87,96.2],o:"缅甸"},{k:"新德里",c:[28.61,77.21],o:"印度"},{k:"孟买",c:[19.08,72.88],o:"印度"},{k:"果阿",c:[15.5,73.83],o:"印度"},{k:"科伦坡",c:[6.93,79.85],o:"斯里兰卡"},{k:"康提",c:[7.3,80.64],o:"斯里兰卡"},{k:"加德满都",c:[27.72,85.32],o:"尼泊尔"},{k:"迪拜",c:[25.2,55.27],o:"阿联酋"},{k:"阿布扎比",c:[24.45,54.65],o:"阿联酋"},{k:"多哈",c:[25.29,51.53],o:"卡塔尔"},{k:"利雅得",c:[24.71,46.68],o:"沙特阿拉伯"},{k:"麦加",c:[21.39,39.86],o:"沙特阿拉伯"},{k:"伊斯坦布尔",c:[41.01,28.98],o:"土耳其"},{k:"安塔利亚",c:[36.9,30.71],o:"土耳其"},{k:"伊兹密尔",c:[38.42,27.14],o:"土耳其"},{k:"开罗",c:[30.04,31.24],o:"埃及"},{k:"卢克索",c:[25.7,32.64],o:"埃及"},{k:"阿斯旺",c:[24.09,32.9],o:"埃及"},{k:"赫尔格达",c:[27.26,33.81],o:"埃及"},{k:"马拉喀什",c:[31.63,-8.01],o:"摩洛哥"},{k:"卡萨布兰卡",c:[33.57,-7.59],o:"摩洛哥"},{k:"非斯",c:[34.03,-5],o:"摩洛哥"},{k:"开普敦",c:[-33.92,18.42],o:"南非"},{k:"约翰内斯堡",c:[-26.2,28.05],o:"南非"},{k:"内罗毕",c:[-1.29,36.82],o:"肯尼亚"},{k:"桑给巴尔",c:[-6.16,39.19],o:"坦桑尼亚"},{k:"巴黎",c:[48.86,2.35],o:"法国"},{k:"里昂",c:[45.76,4.84],o:"法国"},{k:"马赛",c:[43.3,5.37],o:"法国"},{k:"尼斯",c:[43.71,7.26],o:"法国"},{k:"波尔多",c:[44.84,-0.58],o:"法国"},{k:"斯特拉斯堡",c:[48.57,7.75],o:"法国"},{k:"阿维尼翁",c:[43.95,4.81],o:"法国"},{k:"罗马",c:[41.9,12.5],o:"意大利"},{k:"米兰",c:[45.46,9.19],o:"意大利"},{k:"威尼斯",c:[45.44,12.32],o:"意大利"},{k:"佛罗伦萨",c:[43.77,11.25],o:"意大利"},{k:"那不勒斯",c:[40.85,14.27],o:"意大利"},{k:"比萨",c:[43.72,10.4],o:"意大利"},{k:"马德里",c:[40.42,-3.7],o:"西班牙"},{k:"巴塞罗那",c:[41.39,2.17],o:"西班牙"},{k:"塞维利亚",c:[37.39,-5.99],o:"西班牙"},{k:"格拉纳达",c:[37.18,-3.6],o:"西班牙"},{k:"瓦伦西亚",c:[39.47,-0.38],o:"西班牙"},{k:"里斯本",c:[38.72,-9.14],o:"葡萄牙"},{k:"波尔图",c:[41.16,-8.63],o:"葡萄牙"},{k:"伦敦",c:[51.51,-0.13],o:"英国"},{k:"爱丁堡",c:[55.95,-3.19],o:"英国"},{k:"曼彻斯特",c:[53.48,-2.24],o:"英国"},{k:"牛津",c:[51.75,-1.26],o:"英国"},{k:"剑桥",c:[52.21,0.12],o:"英国"},{k:"都柏林",c:[53.35,-6.26],o:"爱尔兰"},{k:"柏林",c:[52.52,13.41],o:"德国"},{k:"慕尼黑",c:[48.14,11.58],o:"德国"},{k:"法兰克福",c:[50.11,8.68],o:"德国"},{k:"汉堡",c:[53.55,9.99],o:"德国"},{k:"科隆",c:[50.94,6.96],o:"德国"},{k:"阿姆斯特丹",c:[52.37,4.9],o:"荷兰"},{k:"布鲁塞尔",c:[50.85,4.35],o:"比利时"},{k:"布鲁日",c:[51.21,3.22],o:"比利时"},{k:"苏黎世",c:[47.38,8.54],o:"瑞士"},{k:"日内瓦",c:[46.2,6.14],o:"瑞士"},{k:"卢塞恩",c:[47.05,8.31],o:"瑞士"},{k:"因特拉肯",c:[46.69,7.86],o:"瑞士"},{k:"采尔马特",c:[46.02,7.75],o:"瑞士"},{k:"维也纳",c:[48.21,16.37],o:"奥地利"},{k:"萨尔茨堡",c:[47.81,13.06],o:"奥地利"},{k:"哈尔施塔特",c:[47.56,13.65],o:"奥地利"},{k:"布拉格",c:[50.08,14.44],o:"捷克"},{k:"克鲁姆洛夫",c:[48.81,14.32],o:"捷克"},{k:"华沙",c:[52.23,21.01],o:"波兰"},{k:"克拉科夫",c:[50.06,19.94],o:"波兰"},{k:"布达佩斯",c:[47.5,19.04],o:"匈牙利"},{k:"雅典",c:[37.98,23.73],o:"希腊"},{k:"圣托里尼",c:[36.39,25.46],o:"希腊"},{k:"哥本哈根",c:[55.68,12.57],o:"丹麦"},{k:"斯德哥尔摩",c:[59.33,18.07],o:"瑞典"},{k:"奥斯陆",c:[59.91,10.75],o:"挪威"},{k:"卑尔根",c:[60.39,5.32],o:"挪威"},{k:"特罗姆瑟",c:[69.65,18.96],o:"挪威"},{k:"赫尔辛基",c:[60.17,24.94],o:"芬兰"},{k:"罗瓦涅米",c:[66.5,25.74],o:"芬兰"},{k:"雷克雅未克",c:[64.15,-21.94],o:"冰岛"},{k:"莫斯科",c:[55.76,37.62],o:"俄罗斯"},{k:"圣彼得堡",c:[59.93,30.36],o:"俄罗斯"},{k:"杜布罗夫尼克",c:[42.65,18.09],o:"克罗地亚"},{k:"萨格勒布",c:[45.81,15.98],o:"克罗地亚"},{k:"纽约",c:[40.71,-74.01],o:"美国"},{k:"洛杉矶",c:[34.05,-118.24],o:"美国"},{k:"旧金山",c:[37.77,-122.42],o:"美国"},{k:"拉斯维加斯",c:[36.17,-115.14],o:"美国"},{k:"西雅图",c:[47.61,-122.33],o:"美国"},{k:"芝加哥",c:[41.88,-87.63],o:"美国"},{k:"华盛顿",c:[38.91,-77.04],o:"美国"},{k:"迈阿密",c:[25.76,-80.19],o:"美国"},{k:"檀香山",c:[21.31,-157.86],o:"美国"},{k:"波士顿",c:[42.36,-71.06],o:"美国"},{k:"温哥华",c:[49.28,-123.12],o:"加拿大"},{k:"多伦多",c:[43.65,-79.38],o:"加拿大"},{k:"蒙特利尔",c:[45.5,-73.57],o:"加拿大"},{k:"班夫",c:[51.18,-115.57],o:"加拿大"},{k:"坎昆",c:[21.16,-86.85],o:"墨西哥"},{k:"墨西哥城",c:[19.43,-99.13],o:"墨西哥"},{k:"哈瓦那",c:[23.11,-82.37],o:"古巴"},{k:"里约热内卢",c:[-22.91,-43.17],o:"巴西"},{k:"圣保罗",c:[-23.55,-46.63],o:"巴西"},{k:"库斯科",c:[-13.53,-71.97],o:"秘鲁"},{k:"利马",c:[-12.05,-77.04],o:"秘鲁"},{k:"布宜诺斯艾利斯",c:[-34.6,-58.38],o:"阿根廷"},{k:"圣地亚哥",c:[-33.45,-70.67],o:"智利"},{k:"乌尤尼",c:[-20.46,-66.83],o:"玻利维亚"},{k:"悉尼",c:[-33.87,151.21],o:"澳大利亚"},{k:"墨尔本",c:[-37.81,144.96],o:"澳大利亚"},{k:"布里斯班",c:[-27.47,153.03],o:"澳大利亚"},{k:"黄金海岸",c:[-28.02,153.4],o:"澳大利亚"},{k:"珀斯",c:[-31.95,115.86],o:"澳大利亚"},{k:"凯恩斯",c:[-16.92,145.77],o:"澳大利亚"},{k:"奥克兰",c:[-36.85,174.76],o:"新西兰"},{k:"皇后镇",c:[-45.03,168.66],o:"新西兰"},{k:"基督城",c:[-43.53,172.64],o:"新西兰"},{k:"大溪地",c:[-17.54,-149.56],o:"法属波利尼西亚"},{k:"波拉波拉",c:[-16.5,-151.74],o:"法属波利尼西亚"}];
+const CN_SPOTS=[{k:"承德",p:"河北",c:[40.95,117.96]},{k:"北戴河",p:"河北",c:[39.83,119.49]},{k:"秦皇岛",p:"河北",c:[39.93,119.6]},{k:"平遥",p:"山西",c:[37.2,112.17]},{k:"大同",p:"山西",c:[40.08,113.3]},{k:"五台山",p:"山西",c:[39.08,113.55]},{k:"呼伦贝尔",p:"内蒙古",c:[49.21,119.77]},{k:"鄂尔多斯",p:"内蒙古",c:[39.6,109.78]},{k:"阿拉善",p:"内蒙古",c:[38.85,105.67]},{k:"大连",p:"辽宁",c:[38.91,121.61]},{k:"长白山",p:"吉林",c:[42.0,128.05]},{k:"哈尔滨",p:"黑龙江",c:[45.8,126.53]},{k:"漠河",p:"黑龙江",c:[52.97,122.54]},{k:"雪乡",p:"黑龙江",c:[44.33,128.86]},{k:"苏州",p:"江苏",c:[31.3,120.58]},{k:"无锡",p:"江苏",c:[31.49,120.31]},{k:"南京",p:"江苏",c:[32.06,118.8]},{k:"扬州",p:"江苏",c:[32.39,119.41]},{k:"周庄",p:"江苏",c:[31.11,120.85]},{k:"杭州",p:"浙江",c:[30.27,120.15]},{k:"宁波",p:"浙江",c:[29.87,121.55]},{k:"温州",p:"浙江",c:[28.0,120.67]},{k:"乌镇",p:"浙江",c:[30.74,120.49]},{k:"西塘",p:"浙江",c:[30.95,120.89]},{k:"普陀山",p:"浙江",c:[30.0,122.38]},{k:"千岛湖",p:"浙江",c:[29.6,118.95]},{k:"黄山",p:"安徽",c:[30.13,118.16]},{k:"宏村",p:"安徽",c:[30.06,117.98]},{k:"九华山",p:"安徽",c:[30.48,117.8]},{k:"厦门",p:"福建",c:[24.48,118.09]},{k:"泉州",p:"福建",c:[24.87,118.68]},{k:"武夷山",p:"福建",c:[27.72,118.03]},{k:"景德镇",p:"江西",c:[29.27,117.18]},{k:"婺源",p:"江西",c:[29.25,117.86]},{k:"庐山",p:"江西",c:[29.56,115.97]},{k:"三清山",p:"江西",c:[28.92,118.06]},{k:"青岛",p:"山东",c:[36.07,120.38]},{k:"泰安",p:"山东",c:[36.2,117.09]},{k:"曲阜",p:"山东",c:[35.58,116.99]},{k:"威海",p:"山东",c:[37.51,122.12]},{k:"烟台",p:"山东",c:[37.46,121.44]},{k:"泰山",p:"山东",c:[36.25,117.1]},{k:"洛阳",p:"河南",c:[34.62,112.45]},{k:"开封",p:"河南",c:[34.79,114.31]},{k:"少林寺",p:"河南",c:[34.51,112.94]},{k:"安阳",p:"河南",c:[36.1,114.35]},{k:"宜昌",p:"湖北",c:[30.69,111.29]},{k:"神农架",p:"湖北",c:[31.74,110.68]},{k:"武当山",p:"湖北",c:[32.4,111.0]},{k:"张家界",p:"湖南",c:[29.12,110.48]},{k:"凤凰",p:"湖南",c:[27.95,109.6]},{k:"衡山",p:"湖南",c:[27.24,112.73]},{k:"深圳",p:"广东",c:[22.55,114.06]},{k:"珠海",p:"广东",c:[22.27,113.58]},{k:"潮汕",p:"广东",c:[23.66,116.12]},{k:"桂林",p:"广西",c:[25.28,110.29]},{k:"阳朔",p:"广西",c:[24.77,110.49]},{k:"北海",p:"广西",c:[21.48,109.12]},{k:"柳州",p:"广西",c:[24.33,109.43]},{k:"三亚",p:"海南",c:[18.25,109.51]},{k:"万宁",p:"海南",c:[18.8,110.39]},{k:"成都",p:"四川",c:[30.57,104.06]},{k:"九寨沟",p:"四川",c:[33.26,103.92]},{k:"稻城",p:"四川",c:[29.04,100.3]},{k:"乐山",p:"四川",c:[29.55,103.77]},{k:"都江堰",p:"四川",c:[31.0,103.62]},{k:"峨眉山",p:"四川",c:[29.6,103.48]},{k:"西江",p:"贵州",c:[26.49,108.32]},{k:"黄果树",p:"贵州",c:[25.99,105.67]},{k:"梵净山",p:"贵州",c:[27.92,108.68]},{k:"昆明",p:"云南",c:[24.88,102.83]},{k:"大理",p:"云南",c:[25.61,100.27]},{k:"丽江",p:"云南",c:[26.86,100.23]},{k:"香格里拉",p:"云南",c:[27.83,99.7]},{k:"西双版纳",p:"云南",c:[22.01,100.8]},{k:"腾冲",p:"云南",c:[25.02,98.5]},{k:"拉萨",p:"西藏",c:[29.65,91.14]},{k:"林芝",p:"西藏",c:[29.65,94.36]},{k:"日喀则",p:"西藏",c:[29.27,88.88]},{k:"珠峰",p:"西藏",c:[28.0,86.9]},{k:"西安",p:"陕西",c:[34.34,108.94]},{k:"华山",p:"陕西",c:[34.48,110.09]},{k:"敦煌",p:"甘肃",c:[40.14,94.66]},{k:"张掖",p:"甘肃",c:[38.93,100.45]},{k:"嘉峪关",p:"甘肃",c:[39.77,98.29]},{k:"青海湖",p:"青海",c:[36.9,100.2]},{k:"茶卡",p:"青海",c:[36.77,99.08]},{k:"中卫",p:"宁夏",c:[37.5,105.19]},{k:"乌鲁木齐",p:"新疆",c:[43.83,87.62]},{k:"喀什",p:"新疆",c:[39.47,75.99]},{k:"伊犁",p:"新疆",c:[43.92,81.32]},{k:"喀纳斯",p:"新疆",c:[48.7,87.03]},{k:"吐鲁番",p:"新疆",c:[42.95,89.19]},{k:"台北",p:"台湾",c:[25.03,121.57]},{k:"高雄",p:"台湾",c:[22.62,120.31]},{k:"台中",p:"台湾",c:[24.15,120.67]},{k:"花莲",p:"台湾",c:[23.98,121.6]},{k:"垦丁",p:"台湾",c:[21.94,120.8]},{k:"阿里山",p:"台湾",c:[23.51,120.8]}];
+const GEO_CONTS=[
+ {id:'as',n:'亚洲',vb:[410,30,310,174]},
+ {id:'eu',n:'欧洲',vb:[310,36,140,76]},
+ {id:'af',n:'非洲',vb:[320,106,144,146]},
+ {id:'na',n:'北美洲',vb:[20,30,236,136]},
+ {id:'sa',n:'南美洲',vb:[190,164,110,130]},
+ {id:'oc',n:'大洋洲',vb:[580,198,140,84]}
+];
+function continentOf(c){
+  const lat=c[0],lon=c[1];
+  if(lat<-57)return null;
+  if(lat>=55&&lon>=-170&&lon<=-30)return 'na';
+  if(lat>=34&&lon>=-25&&lon<=45)return 'eu';
+  if(lat>=8&&lon>=-170&&lon<=-52)return 'na';
+  if(lat<8&&lat>=-57&&lon>=-85&&lon<=-30)return 'sa';
+  if(lat<34&&lat>=-36&&lon>=-20&&lon<=34)return 'af';
+  if(lat<=-10&&lat>=-50&&lon>=110)return 'oc';
+  if(lat<0&&lon<=-130)return 'oc';
+  if(lon>=25)return 'as';
+  return null;
+}
+const inChinaBox=c=>c[0]>=17&&c[0]<=54.5&&c[1]>=72&&c[1]<=136.5;
+function panelLabels(items,vb,px){
+  const s=px/vb[2],fs=10/s,sw=fs*0.22,kept=[],out=[];
+  items.forEach(it=>{
+    const[x,y]=geoXY(it.c);
+    const sx=(x-vb[0])*s,sy=(y-vb[1])*s;
+    if(sx<-8||sx>px+8||sy<-4||sy>vb[3]*s+8)return;
+    for(const p of kept){if(Math.abs(p[1]-sy)<12&&Math.abs(p[0]-sx)<44)return}
+    kept.push([sx,sy]);
+    out.push(`<text class="gm-lbl" font-size="${fs.toFixed(2)}" stroke-width="${sw.toFixed(2)}" x="${(x+fs*0.55).toFixed(1)}" y="${(y+fs*0.35).toFixed(1)}">${esc(it.k)}</text>`);
+  });
+  return out.join('');
+}
 const GEO_LEGACY={"中国上海": ["上海"], "中国成都": ["四川"], "中国杭州": ["浙江"], "中国云南": ["云南"], "中国三亚": ["海南"], "中国西藏": ["西藏"], "中国新疆": ["新疆"], "香港": ["香港"], "澳门": ["澳门"], "日本东京": ["日本", "东京"], "日本大阪": ["日本", "大阪"], "韩国首尔": ["韩国", "首尔"], "泰国曼谷": ["泰国", "曼谷"], "新加坡": ["新加坡"], "冰岛": ["冰岛"], "法国巴黎": ["法国", "巴黎"], "意大利罗马": ["意大利", "罗马"], "瑞士苏黎世": ["瑞士", "苏黎世"], "澳大利亚悉尼": ["澳大利亚", "悉尼"]};
 /* 世界地图轮廓 WORLD_MAP：Natural Earth 50m admin_0 国家边界（公有领域），等距圆柱投影 720×360，真实比例 */
 /* 中国国家+省份三层名录见 GEO_COUNTRIES/GEO_PROVS/GEO_CITIES；省份边界 CN_PROV：50m admin_1 */
@@ -1445,7 +1477,7 @@ function geoAutoSet(){
     const st=tripStatus(t);if(st!=='ended'&&st!=='ongoing')return;
     const d=t.dest||'';
     GEO_COUNTRIES.forEach(c=>{if(has(d,c.k,GEO_ALIAS[c.k]))s.add(c.k)});
-    GEO_PROVS.forEach(p=>{if(has(d,p.k,p.a)){s.add(p.k);s.add('中国')}});
+    GEO_PROVS.forEach(p=>{if(has(d,p.k,p.a)){s.add(p.k);s.add('中国');(p.a||[]).forEach(a=>{if(d.includes(a))s.add(a)})}});
     GEO_CITIES.forEach(ci=>{if(d.includes(ci.k)){s.add(ci.k);s.add(ci.o)}});
   });
   return s;
@@ -1486,115 +1518,43 @@ if(!store.get('wb.geoMig',0)){
   store.set('wb.geoMig',1);saveGeo();
 }
 const geoXY=c=>[(c[1]+180)/360*720,(90-c[0])/180*360];
-let geoView={x:0,y:0,w:720};
-function clampGeoView(){
-  geoView.w=Math.min(720,Math.max(54,geoView.w));
-  geoView.x=Math.min(720-geoView.w,Math.max(0,geoView.x));
-  geoView.y=Math.min(360-geoView.w/2,Math.max(0,geoView.y));
-}
-function applyGeoView(){
-  const svg=$('#geoSvg');if(!svg)return;
-  const w=geoView.w,k=w/720;
-  svg.setAttribute('viewBox',`${geoView.x} ${geoView.y} ${w} ${w/2}`);
-  svg.querySelectorAll('.gm').forEach(c=>c.setAttribute('r',(+c.getAttribute('data-cr')||4.5)*k));
-  const rect=svg.getBoundingClientRect();
-  if(rect.width>0){
-    const s=rect.width/w,fs=11/s,sw=fs*0.22,kept=[];
-    svg.querySelectorAll('.gm-city').forEach(g=>{
-      const cx=+g.getAttribute('data-cx'),cy=+g.getAttribute('data-cy');
-      const t=g.querySelector('.gm-lbl');if(!t)return;
-      const sx=(cx-geoView.x)*s,sy=(cy-geoView.y)*s;
-      let ok=sx>=-10&&sx<=rect.width+10&&sy>=-10&&sy<=rect.height+10;
-      if(ok)for(const p of kept){if(Math.abs(p[1]-sy)<14&&Math.abs(p[0]-sx)<48){ok=false;break}}
-      if(ok)kept.push([sx,sy]);
-      t.style.visibility=ok?'':'hidden';
-      if(ok){
-        t.setAttribute('font-size',fs.toFixed(2));
-        t.setAttribute('stroke-width',sw.toFixed(2));
-        t.setAttribute('x',(cx+fs*0.55).toFixed(1));
-        t.setAttribute('y',(cy+fs*0.35).toFixed(1));
-      }
-    });
-  }
-  const cn=$('#geoCN');if(cn)cn.style.display=w<=420?'':'none';
-  const cg=$('#geoCityG');if(cg)cg.style.display=w<=300?'':'none';
-}
-function geoZoomAt(cx,cy,f){
-  const nw=Math.min(720,Math.max(54,geoView.w/f));
-  const r=nw/geoView.w;
-  geoView.x=cx-(cx-geoView.x)*r;
-  geoView.y=cy-(cy-geoView.y)*r;
-  geoView.w=nw;
-  clampGeoView();applyGeoView();
-}
 function renderGeo(){
   const vis=visitedSet();
   const gc=geoCounts();
   const customs=geoCustomPoints();
-  $('#geoStats').textContent=`已点亮 ${gc.nC} 国 · ${gc.nP} 省 · ${gc.nT} 城`+(customs.length?` · +${customs.length} 自定义`:'');
-  const dot=(p,r)=>{const[x,y]=geoXY(p.c);return `<circle class="gm lit" data-cr="${r}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/>`};
-  const cityG=(c,lit)=>{const[x,y]=geoXY(c.c);return `<g class="gm-city${lit?' on':''}" data-cx="${x.toFixed(1)}" data-cy="${y.toFixed(1)}"><circle class="gm${lit?' lit':''}" data-cr="${lit?3.5:2.6}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${lit?3.5:2.6}"/><text class="gm-lbl${lit?'':' off'}" x="${(x+6).toFixed(1)}" y="${(y+3.5).toFixed(1)}">${esc(c.k)}</text></g>`};
-  $('#geoMap').innerHTML=`<svg id="geoSvg" viewBox="0 0 720 360" role="img" aria-label="世界地图">
-    <defs><linearGradient id="geoG" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FF6FB5"/><stop offset="1" stop-color="#9D6BFF"/>
-    </linearGradient></defs>
-    <path class="geo-land" d="${WORLD_MAP}"/>
-    <g id="geoCN" style="display:none"><path class="geo-prov" d="${CN_PROV}"/></g>
-    ${GEO_COUNTRIES.filter(c=>vis.has(c.k)).map(c=>dot(c,4.5)).join('')}
-    ${GEO_PROVS.filter(p=>vis.has(p.k)).map(p=>dot(p,4.5)).join('')}
-    ${customs.map(c=>dot(c,4.5)).join('')}
-    <g id="geoCityG" style="display:none">${GEO_CITIES.filter(c=>vis.has(c.k)).map(c=>cityG(c,1)).join('')}${customs.map(c=>cityG(c,1)).join('')}${GEO_CITIES.filter(c=>!vis.has(c.k)).map(c=>cityG(c,0)).join('')}</g>
-  </svg>`;
-  applyGeoView();
-  const litList=[...GEO_COUNTRIES.filter(c=>vis.has(c.k)),...GEO_PROVS.filter(p=>vis.has(p.k)),...GEO_CITIES.filter(c=>vis.has(c.k))].map(x=>x.k).concat(customs.map(c=>c.k));
+  const litC=GEO_COUNTRIES.filter(c=>vis.has(c.k));
+  const litP=GEO_PROVS.filter(p=>vis.has(p.k));
+  const litT=GEO_CITIES.filter(c=>vis.has(c.k));
+  const contHas={};
+  litC.forEach(c=>{if(!inChinaBox(c.c)){const t=continentOf(c.c);if(t)contHas[t]=1}});
+  litT.forEach(c=>{const t=continentOf(c.c);if(t)contHas[t]=1});
+  customs.forEach(c=>{const t=inChinaBox(c.c)?'as':continentOf(c.c);if(t)contHas[t]=1});
+  if(litP.length||litC.some(c=>inChinaBox(c.c)))contHas.as=1;
+  const nCont=Object.keys(contHas).length;
+  $('#geoStats').textContent=`已点亮 ${gc.nC} 国 · ${gc.nP} 省 · ${gc.nT} 城`+(customs.length?` · +${customs.length} 自定义`:'')+` · ${nCont}/6 洲`;
+  const dot=(c,r)=>{const[x,y]=geoXY(c.c);return `<circle class="gm lit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/>`};
+  const dimDot=(c,r)=>{const[x,y]=geoXY(c.c);return `<circle class="gm" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/>`};
+  const defs=`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="geoG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF6FB5"/><stop offset="1" stop-color="#9D6BFF"/></linearGradient><path id="geoLandP" class="geo-land" fill="#2E2444" stroke="rgba(255,255,255,.12)" stroke-width=".6" vector-effect="non-scaling-stroke" d="${WORLD_MAP}"/><path id="geoCNP" class="geo-prov" fill="none" stroke="rgba(255,111,181,.45)" stroke-width=".7" vector-effect="non-scaling-stroke" d="${CN_PROV}"/></defs></svg>`;
+  const ov=`<svg viewBox="0 30 720 262" role="img" aria-label="世界总览"><use href="#geoLandP"/>${litC.map(c=>dot(c,3)).join('')}${litP.map(p=>dot(p,3)).join('')}${customs.map(c=>dot(c,3)).join('')}${litT.map(c=>dot(c,1.8)).join('')}</svg>`;
+  const cnVB=[503,70,132,78];
+  const cnCus=customs.filter(c=>inChinaBox(c.c));
+  const cnSpotLit=CN_SPOTS.filter(sp=>vis.has(sp.k));
+  const cnSpotDim=CN_SPOTS.filter(sp=>!vis.has(sp.k));
+  const cn=`<div class="geo-panel gp-cn"><div class="gp-head"><span>🇨🇳 中国</span><span class="gp-stat">${litP.length} 省 · ${cnSpotLit.length+cnCus.length} 城</span></div><svg viewBox="${cnVB.join(' ')}" role="img" aria-label="中国板块"><use href="#geoLandP"/><use href="#geoCNP"/>${cnSpotDim.map(sp=>dimDot(sp,1)).join('')}${litP.map(pp=>dot(pp,2.4)).join('')}${cnSpotLit.map(sp=>dot(sp,1.8)).join('')}${cnCus.map(c=>dot(c,2.4)).join('')}${panelLabels([...cnCus,...cnSpotLit,...litP],cnVB,356)}</svg></div>`;
+  const grid=GEO_CONTS.map(ct=>{
+    const cs=litC.filter(c=>continentOf(c.c)===ct.id&&!inChinaBox(c.c));
+    const ts=litT.filter(c=>continentOf(c.c)===ct.id);
+    const cu=customs.filter(c=>continentOf(c.c)===ct.id&&!inChinaBox(c.c));
+    const dim=GEO_CITIES.filter(c=>!vis.has(c.k)&&continentOf(c.c)===ct.id);
+    const n=cs.length+ts.length+cu.length;
+    return `<div class="geo-panel${n?'':' gp-dim'}"><div class="gp-head"><span>${ct.n}</span><span class="gp-stat">${n?cs.length+' 国 · '+(ts.length+cu.length)+' 城':'暂未点亮'}</span></div><svg viewBox="${ct.vb.join(' ')}" role="img" aria-label="${ct.n}板块"><use href="#geoLandP"/>${dim.map(c=>dimDot(c,1.1)).join('')}${cs.map(c=>dot(c,3)).join('')}${ts.map(c=>dot(c,2)).join('')}${cu.map(c=>dot(c,2.4)).join('')}${panelLabels([...cu,...ts,...cs],ct.vb,172)}</svg></div>`;
+  }).join('');
+  $('#geoMap').innerHTML=defs+ov+cn+`<div class="geo-grid">${grid}</div>`;
+  const litList=[...litC,...litP,...litT].map(x=>x.k).concat(CN_SPOTS.filter(sp=>vis.has(sp.k)).map(sp=>sp.k)).concat(customs.map(c=>c.k));
   $('#geoArch').innerHTML=litList.length
     ?litList.map(k=>`<span class="arch-chip">✓ ${esc(k)}</span>`).join('')
     :'<span class="arch-chip" style="opacity:.5">还没有足迹，完成一次旅行就会自动点亮</span>';
 }
-$('#gzIn').addEventListener('click',()=>geoZoomAt(geoView.x+geoView.w/2,geoView.y+geoView.w/4,1.6));
-$('#gzOut').addEventListener('click',()=>geoZoomAt(geoView.x+geoView.w/2,geoView.y+geoView.w/4,1/1.6));
-$('#gzRe').addEventListener('click',()=>{geoView={x:0,y:0,w:720};applyGeoView()});
-(function(){
-  const el=$('#geoMap');
-  const ptrs=new Map();
-  let pinchD=0;
-  const svgXY=(cx,cy)=>{
-    const r=el.getBoundingClientRect();
-    return [geoView.x+(cx-r.left)/r.width*geoView.w,geoView.y+(cy-r.top)/r.height*(geoView.w/2)];
-  };
-  el.addEventListener('pointerdown',e=>{
-    el.setPointerCapture(e.pointerId);
-    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(ptrs.size===2){
-      const[a,b]=[...ptrs.values()];
-      pinchD=Math.hypot(a.x-b.x,a.y-b.y);
-    }
-  });
-  el.addEventListener('pointermove',e=>{
-    const p=ptrs.get(e.pointerId);if(!p)return;
-    const dx=e.clientX-p.x,dy=e.clientY-p.y;
-    p.x=e.clientX;p.y=e.clientY;
-    if(ptrs.size===2){
-      const[a,b]=[...ptrs.values()];
-      const d=Math.hypot(a.x-b.x,a.y-b.y);
-      if(pinchD>0&&d>0)geoZoomAt(...svgXY((a.x+b.x)/2,(a.y+b.y)/2),d/pinchD);
-      pinchD=d;
-    }else if(ptrs.size===1){
-      const r=el.getBoundingClientRect();
-      geoView.x-=dx/r.width*geoView.w;
-      geoView.y-=dy/r.height*(geoView.w/2);
-      clampGeoView();applyGeoView();
-    }
-  });
-  const rel=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinchD=0};
-  el.addEventListener('pointerup',rel);
-  el.addEventListener('pointercancel',rel);
-  el.addEventListener('wheel',e=>{
-    e.preventDefault();
-    geoZoomAt(...svgXY(e.clientX,e.clientY),e.deltaY<0?1.25:1/1.25);
-  },{passive:false});
-  // 点亮仅由旅行历史自动生成，地图点击不再手动点亮/熄灭（v1.12.0）
-})();
 function tripStatus(t){
   const today=todayStr();
   if(t.end<today)return'ended';
@@ -3114,7 +3074,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.19.0';
+const WB_VER='1.20.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
