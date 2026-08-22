@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=23">
+<link rel="manifest" href="manifest.json?v=24">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -2579,7 +2579,7 @@ if(Array.isArray(depAccs)){const n0=depAccs.length;depAccs=depAccs.filter(a=>a&&
 if(!Array.isArray(depAccs)||!depAccs.length){depAccs=[{id:'a0',name:'我的存款',ic:'🐷'}];store.set('wb.depAccs',depAccs)}
 const saveAccs=()=>store.set('wb.depAccs',depAccs);
 if(deposits.some(r=>!r.acc)){deposits.forEach(r=>{if(!r.acc)r.acc='a0'});saveDeps()}
-const ACC_ICS=['🐷','💰','👛','🏦','🎓','🎯','🏠','✈️','👶','🐱','🎁','💍','👦','👧'];
+const ACC_ICS=['🐷','💰','👛','🏦','🎓','🎯','🏠','✈️','👶','🐱','🎁','💍','🤵','💃'];
 let depAccF='all',depAccSel='a0';
 const accOf=id=>depAccs.find(a=>a.id===id);
 const depsAll=()=>deposits;
@@ -2589,7 +2589,7 @@ let depCats=store.get('wb.depCats',null);
 if(Array.isArray(depCats)){const n0=depCats.length;depCats=depCats.filter(c=>c&&typeof c.name==='string'&&c.name);depCats.forEach(c=>{if(typeof c.ic!=='string'||!c.ic)c.ic='✨';if(typeof c.id!=='string'||!c.id)c.id=uid()});if(depCats.length!==n0)store.set('wb.depCats',depCats)}
 if(!Array.isArray(depCats)||!depCats.length){depCats=CAT_DEFAULTS.map((x,i)=>({id:'c'+i,name:x[0],ic:x[1]}));store.set('wb.depCats',depCats)}
 const saveCats=()=>store.set('wb.depCats',depCats);
-const CAT_ICS=['💼','📈','🎁','🧧','🧾','🎯','✨','💰','🎓','✈️','🏠','🛍️','👦','👧'];
+const CAT_ICS=['💼','📈','🎁','🧧','🧾','🎯','✨','💰','🎓','✈️','🏠','🛍️','🤵','💃'];
 let editingDepId=null,depCat=depCats[0].name;
 const depCatIc=n=>{const c=depCats.find(x=>x.name===n);return c?c.ic:'✨'};
 const depTotal=()=>deposits.reduce((a,b)=>a+ +b.amt,0);
@@ -3255,7 +3255,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.22.0';
+const WB_VER='1.22.1';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
