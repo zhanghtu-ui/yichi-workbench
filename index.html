@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=21">
+<link rel="manifest" href="manifest.json?v=22">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -2421,6 +2421,8 @@ const Sync={
           if(!( !exist||r.updatedAt>(exist.updatedAt||0) ))continue;
           const v=this.decodeItem(r,k);
           if(v===null)continue;
+          if(k==='wb.depAccs'&&!(typeof v.name==='string'&&v.name))continue;   /* 防存款记录串入账户列表 */
+          if(k==='wb.deposits'&&!(typeof v.date==='string'&&v.amt!==undefined))continue;   /* 防账户对象串入存款列表 */
           if(exist){const i=local.findIndex(it=>this.itemKey(it,k)===r.id);if(i>-1)local[i]=v;else local.push(v)}
           else local.push(v);
           map[r.id]={id:r.id,payload:r.payload,createdAt:r.createdAt||0,updatedAt:r.updatedAt};
@@ -2555,6 +2557,7 @@ window.addEventListener('touchend',()=>{pdOn=false},{passive:true});
 let deposits=store.get('wb.deposits',[]);
 const saveDeps=()=>store.set('wb.deposits',deposits);
 let depAccs=store.get('wb.depAccs',null);
+if(Array.isArray(depAccs)){const n0=depAccs.length;depAccs=depAccs.filter(a=>a&&typeof a.name==='string'&&a.name);depAccs.forEach(a=>{if(typeof a.ic!=='string'||!a.ic)a.ic='🐷';if(typeof a.id!=='string'||!a.id)a.id=uid()});if(depAccs.length!==n0)store.set('wb.depAccs',depAccs)}
 if(!Array.isArray(depAccs)||!depAccs.length){depAccs=[{id:'a0',name:'我的存款',ic:'🐷'}];store.set('wb.depAccs',depAccs)}
 const saveAccs=()=>store.set('wb.depAccs',depAccs);
 if(deposits.some(r=>!r.acc)){deposits.forEach(r=>{if(!r.acc)r.acc='a0'});saveDeps()}
@@ -3171,7 +3174,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.21.0';
+const WB_VER='1.21.1';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
