@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=25">
+<link rel="manifest" href="manifest.json?v=26">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -182,6 +182,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .gd-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px}
 .gd-stat{font-size:11px;color:var(--sky-deep);font-weight:600}
 .geo-back{padding:5px 12px;border-radius:14px;background:var(--sky-tint);color:var(--sky-deep);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+[data-gz]{cursor:pointer}
 .geo-land{fill:#2E2444;stroke:rgba(255,255,255,.12);stroke-width:.6;vector-effect:non-scaling-stroke}
 .geo-prov{fill:none;stroke:rgba(255,111,181,.45);stroke-width:.7;vector-effect:non-scaling-stroke}
 .gm{fill:none;stroke:rgba(245,238,248,.4);stroke-width:1.1}
@@ -1561,7 +1562,7 @@ if(!store.get('wb.geoMig',0)){
   store.set('wb.geoMig',1);saveGeo();
 }
 const geoXY=c=>[(c[1]+180)/360*720,(90-c[0])/180*360];
-let geoDetail=null;
+let geoDetail=null,geoZoom=null;
 function renderGeo(){
   const vis=visitedSet();
   const gc=geoCounts();
@@ -1594,33 +1595,47 @@ function renderGeo(){
     return `<div class="geo-panel${n?'':' gp-dim'}"${ct.id==='eu'?' data-zoom="eu"':''}><div class="gp-head"><span>${ct.n}${ct.id==='eu'?'<i class="gp-zoom">🔍</i>':''}</span><span class="gp-stat">${n?cs.length+' 国 · '+(ts.length+cu.length)+' 城':'暂未点亮'}</span></div><svg viewBox="${ct.vb.join(' ')}" role="img" aria-label="${ct.n}板块"><use href="#geoLandP"/>${dim.map(c=>dimDot(c,1.1)).join('')}${cs.map(c=>dot(c,3)).join('')}${ts.map(c=>dot(c,2)).join('')}${cu.map(c=>dot(c,2.4)).join('')}${panelLabels([...cu,...ts,...cs],ct.vb,172)}</svg></div>`;
   }).join('');
   let detail='';
-  if(geoDetail==='cn'){
+  if(geoDetail==='cn'||geoDetail==='eu'){
+    const isCn=geoDetail==='cn';
+    const BW=isCn?132:140,BH=isCn?78:76,BVB=isCn?cnVB:[310,36,140,76];
+    const euC=isCn?[]:litC.filter(c=>continentOf(c.c)==='eu'&&!inChinaBox(c.c));
+    const euT=isCn?[]:litT.filter(c=>continentOf(c.c)==='eu');
+    const euCu=isCn?[]:customs.filter(c=>continentOf(c.c)==='eu'&&!inChinaBox(c.c));
+    const euDim=isCn?[]:GEO_CITIES.filter(c=>!vis.has(c.k)&&continentOf(c.c)==='eu');
+    const dims=isCn?cnSpotDim:euDim,lits=isCn?cnSpotLit:euT,big=isCn?litP:euC,cus=isCn?cnCus:euCu;
+    const zb=geoZoom?[geoZoom.x-geoZoom.w/2,geoZoom.y-(geoZoom.w*BH/BW)/2,geoZoom.w,geoZoom.w*BH/BW]:BVB;
+    const u=zb[2]/356;
+    const P=(c,r,cls,st)=>{const[x,y]=geoXY(c.c);return `<circle class="${cls}"${st?` style="stroke-width:${(2.5*u).toFixed(2)}"`:''} cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r*u).toFixed(2)}"/>`};
+    const hit=(c,r)=>{const[x,y]=geoXY(c.c);return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r*u).toFixed(2)}" fill="transparent" data-gz="${x.toFixed(1)},${y.toFixed(1)}"/>`};
     const kept=[];
-    const litLbl=panelLabels([...cnCus,...cnSpotLit,...litP],cnVB,356,'gm-lbl',kept,11.5);
-    const dimLbl=panelLabels(cnSpotDim,cnVB,356,'gm-lbl off',kept,11);
-    detail=`<div class="geo-detail"><div class="gd-head"><span class="geo-back" data-geoback="1">← 返回总览</span><span class="gd-stat">🇨🇳 中国 · ${litP.length} 省 · ${cnSpotLit.length+cnCus.length} 城点亮</span></div><svg viewBox="${cnVB.join(' ')}" role="img" aria-label="中国放大"><use href="#geoLandP"/><use href="#geoCNP"/>${cnSpotDim.map(sp=>dimDot(sp,1.1)).join('')}${litP.map(pp=>dot(pp,2.6)).join('')}${cnSpotLit.map(sp=>dot(sp,2)).join('')}${cnCus.map(c=>dot(c,2.6)).join('')}${litLbl}${dimLbl}</svg></div>`;
-  }else if(geoDetail==='eu'){
-    const evb=[310,36,140,76];
-    const euC=litC.filter(c=>continentOf(c.c)==='eu'&&!inChinaBox(c.c));
-    const euT=litT.filter(c=>continentOf(c.c)==='eu');
-    const euCu=customs.filter(c=>continentOf(c.c)==='eu'&&!inChinaBox(c.c));
-    const euDim=GEO_CITIES.filter(c=>!vis.has(c.k)&&continentOf(c.c)==='eu');
-    const kept=[];
-    const litLbl=panelLabels([...euCu,...euT,...euC],evb,356,'gm-lbl',kept,11.5);
-    const dimLbl=panelLabels(euDim,evb,356,'gm-lbl off',kept,11);
-    detail=`<div class="geo-detail"><div class="gd-head"><span class="geo-back" data-geoback="1">← 返回总览</span><span class="gd-stat">🌍 欧洲 · ${euC.length} 国 · ${euT.length+euCu.length} 城点亮</span></div><svg viewBox="${evb.join(' ')}" role="img" aria-label="欧洲放大"><use href="#geoLandP"/>${euDim.map(c=>dimDot(c,1.1)).join('')}${euC.map(c=>dot(c,3.4)).join('')}${euT.map(c=>dot(c,2)).join('')}${euCu.map(c=>dot(c,2.6)).join('')}${litLbl}${dimLbl}</svg></div>`;
+    const litLbl=panelLabels([...cus,...lits,...big],zb,356,'gm-lbl',kept,geoZoom?12:11.5);
+    const dimLbl=panelLabels(dims,zb,356,'gm-lbl off',kept,geoZoom?11.5:11);
+    const layers=(isCn?'<use href="#geoLandP"/><use href="#geoCNP"/>':'<use href="#geoLandP"/>')
+      +dims.map(c=>P(c,3,'gm',1)).join('')
+      +big.map(c=>P(c,isCn?6.5:8.5,'gm lit')).join('')
+      +lits.map(c=>P(c,5,'gm lit')).join('')
+      +cus.map(c=>P(c,6.5,'gm lit')).join('')
+      +litLbl+dimLbl
+      +[...dims,...lits,...big,...cus].map(c=>hit(c,11)).join('');
+    const head=geoZoom
+      ?`<span class="geo-back" data-geoback2="1">← 返回</span><span class="gd-stat">${isCn?'\u{1F1E8}\u{1F1F3} 中国':'\u{1F30D} 欧洲'} · ${Math.round(BW/geoZoom.w)}× 放大 · 点按城市移动</span>`
+      :`<span class="geo-back" data-geoback="1">← 返回总览</span><span class="gd-stat">${isCn?'\u{1F1E8}\u{1F1F3} 中国 · '+litP.length+' 省 · '+(cnSpotLit.length+cnCus.length)+' 城点亮':'\u{1F30D} 欧洲 · '+euC.length+' 国 · '+(euT.length+euCu.length)+' 城点亮'}</span>`;
+    detail=`<div class="geo-detail"><div class="gd-head">${head}</div><svg viewBox="${zb.map(v=>+v.toFixed(2)).join(' ')}" role="img" aria-label="${isCn?'中国':'欧洲'}放大">${layers}</svg></div>`;
   }
   $('#geoMap').innerHTML=defs+(detail||ov+cn+`<div class="geo-grid">${grid}</div>`);
-  $('#geoTip').textContent=detail?'放大视图 · 灰色小点是还没点亮的城市，点亮后发光并显示名字':'点亮由旅行记录自动生成 · 点按「中国」或「欧洲」板块可放大到城市';
+  $('#geoTip').textContent=geoZoom?'再放大视图 · 点按任意城市以其为中心移动，「返回」回区域全图':detail?'放大视图 · 灰点是未点亮城市 · 点按任意城市可再放大':'点亮由旅行记录自动生成 · 点按「中国」或「欧洲」板块可放大到城市';
   const litList=[...litC,...litP,...litT].map(x=>x.k).concat(CN_SPOTS.filter(sp=>vis.has(sp.k)).map(sp=>sp.k)).concat(customs.map(c=>c.k));
   $('#geoArch').innerHTML=litList.length
     ?litList.map(k=>`<span class="arch-chip">✓ ${esc(k)}</span>`).join('')
     :'<span class="arch-chip" style="opacity:.5">还没有足迹，完成一次旅行就会自动点亮</span>';
 }
 $('#geoMap').addEventListener('click',e=>{
-  if(e.target.closest('[data-geoback]')){geoDetail=null;renderGeo();return}
+  if(e.target.closest('[data-geoback2]')){geoZoom=null;renderGeo();return}
+  if(e.target.closest('[data-geoback]')){geoDetail=null;geoZoom=null;renderGeo();return}
+  const g=geoDetail?e.target.closest('[data-gz]'):null;
+  if(g){const p=g.getAttribute('data-gz').split(',').map(Number);const bw=geoDetail==='cn'?132:140;geoZoom={x:p[0],y:p[1],w:bw/4};renderGeo();return}
   const z=e.target.closest('[data-zoom]');
-  if(z){geoDetail=z.getAttribute('data-zoom');renderGeo()}
+  if(z){geoDetail=z.getAttribute('data-zoom');geoZoom=null;renderGeo()}
 });
 function tripStatus(t){
   const today=todayStr();
@@ -3286,7 +3301,7 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.23.0';
+const WB_VER='1.24.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
