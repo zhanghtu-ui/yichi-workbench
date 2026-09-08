@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=31">
+<link rel="manifest" href="manifest.json?v=32">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -926,6 +926,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <div class="field" id="aiProxyRow" style="display:none"><label>Edge Function URL</label><input id="aiProxy" type="text" placeholder="https://xxx.supabase.co/functions/v1/wb-ai" autocomplete="off"></div>
     <div class="field"><label>模型</label><div class="chips" id="aiModelChips"></div></div>
     <label class="pack-row" style="margin:0 0 12px"><input type="checkbox" id="aiCtx" checked><span>发送时附带工作台数据摘要（消耗更多 token）</span></label>
+    <label class="pack-row" style="margin:0 0 12px"><input type="checkbox" id="aiWrite" checked><span>允许 AI 调用工具写回工作台（记账/待办）</span></label>
     <button class="btn" id="aiCfgSave">保存</button>
     <button class="btn danger" id="aiClearChat" style="margin-top:8px">清空对话</button>
     <div class="acc-sub" style="margin-top:10px;text-align:center;font-size:12px;color:var(--label2)">Key 仅存本机 localStorage，不上传云端；对话内容会同步</div>
@@ -3520,10 +3521,11 @@ const saveAiChat=()=>store.set('wb.aiChat',aiChat);
 if(!Array.isArray(aiChat))aiChat=[];
 aiChat=aiChat.filter(m=>m&&typeof m.role==='string'&&typeof m.content==='string');
 let aiCfg=store.get('wb.aiCfg',null);          /* {provider,mode,key,proxyUrl,model,ctx} —— 仅本机，不云同步 */
-if(!aiCfg||typeof aiCfg!=='object')aiCfg={provider:'deepseek',mode:'direct',key:'',proxyUrl:'',model:'deepseek-chat',ctx:true};
+if(!aiCfg||typeof aiCfg!=='object')aiCfg={provider:'deepseek',mode:'direct',key:'',proxyUrl:'',model:'deepseek-chat',ctx:true,write:true};
 (()=>{const _pm={deepseek:['deepseek-chat','deepseek-reasoner'],openai:['gpt-4o-mini','gpt-4o','o4-mini']};
 if(!aiCfg.provider||!_pm[aiCfg.provider])aiCfg.provider='deepseek';
 if(_pm[aiCfg.provider].indexOf(aiCfg.model)<0)aiCfg.model=_pm[aiCfg.provider][0];})();
+if(typeof aiCfg.write!=='boolean')aiCfg.write=true;
 const saveAiCfg=()=>store.set('wb.aiCfg',aiCfg);
 let aiBusy=false;
 
@@ -3594,7 +3596,8 @@ function aiMsgHtml(m){
   const cls='ai-msg '+m.role+(m.err?' err':'')+(m.thinking?' thinking':'');
   const flowTag=m.flow?`<span style="opacity:.7;font-size:11px">· ${esc(m.flow)}</span>\n`:'';
   const body=m.thinking&&!m.content?'思考中…':esc(m.content||'');
-  return `<div class="${cls}">${flowTag}${body}<span class="ts">${hh}:${mm}${m.model?' · '+esc(m.model):''}</span></div>`;
+  const toolsTag=(m.tools&&m.tools.length)?`<span style="display:block;font-size:11px;opacity:.85;margin-bottom:4px">🛠 已写回：${esc(m.tools.join('；'))}</span>`:'';
+  return `<div class="${cls}">${flowTag}${toolsTag}${body}<span class="ts">${hh}:${mm}${m.model?' · '+esc(m.model):''}</span></div>`;
 }
 function aiChatHtml(){
   if(!aiChat.length)return `<div class="ai-empty"><div class="kuromi">🪄</div>还没有对话，试试上面的快捷工作流<br>或直接输入你的问题</div>`;
@@ -3647,7 +3650,13 @@ function aiBuildContext(){
 菜单：${pantry.length} 种食材，${dishN} 道可做
 运动：本月 ${sports.filter(r=>r.date.startsWith(m)).length} 次
 工作：${work.filter(w=>!w.done).length} 项进行中
-倒数日：${events.length} 个`;
+倒数日：${events.length} 个
+【接入状态】
+服务商：${aiProv().name} · 模型 ${aiCfg.model||aiProv().defModel} · ${aiCfg.mode==='direct'?'直连 API':'Edge Function 代理'} · ${aiCfg.mode==='direct'?(aiCfg.key?'Key 已配置':'Key 未配置'):(aiCfg.proxyUrl?'代理 URL 已配置':'代理 URL 未配置')} · 写回工具 ${aiCfg.write?'开':'关'} · 对话 ${aiChat.length} 条
+【明细（可直接引用）】
+待办：${tasks.filter(x=>!x.done).slice(0,6).map(x=>x.text).join('；')||'无'}
+近6笔记账：${ledger.slice(-6).map(r=>`${r.date} ${r.type==='income'?'收':'支'} ${r.cat||''} ${fmtMoney(r.amount)}${r.note?' '+r.note:''}`).join('；')||'无'}
+倒数日：${events.slice(0,3).map(e=>`${e.title} ${e.date}`).join('；')||'无'}`;
   }catch(e){return ''}
 }
 
@@ -3673,7 +3682,46 @@ function aiNormalizeMessages(messages,provider,model){
   rest[idx]={role:'user',content:sysBlock+'\n\n'+rest[idx].content};
   return rest;
 }
-async function aiCallLLM(messages){
+const AI_TOOLS=[
+  {type:'function',function:{name:'add_ledger',description:'在工作台记一笔账（真正写入记账模块并刷新界面）',parameters:{type:'object',properties:{type:{type:'string',enum:['expense','income'],description:'支出或收入'},amount:{type:'number',description:'金额，正数，单位欧元'},cat:{type:'string',description:'分类，如 餐饮/交通/购物'},note:{type:'string',description:'备注，如吃了什么'},date:{type:'string',description:'YYYY-MM-DD，缺省为今天'}},required:['type','amount']}}},
+  {type:'function',function:{name:'add_task',description:'在工作台新增一条待办（真正写入任务模块）',parameters:{type:'object',properties:{text:{type:'string',description:'待办内容'},pri:{type:'string',enum:['高','中','低'],description:'优先级，可选'}},required:['text']}}},
+  {type:'function',function:{name:'complete_task',description:'把工作台里某条未完成待办标记为完成（按文字模糊匹配第一条）',parameters:{type:'object',properties:{text_contains:{type:'string',description:'待办文字中包含的关键词'}},required:['text_contains']}}}
+];
+function aiToolsEnabled(model){
+  if(!aiCfg.write)return false;
+  return (aiProv().noTemp||[]).indexOf(model)<0;   /* reasoner / o 系列不支持工具调用 */
+}
+function aiExecTool(name,args){
+  args=args||{};
+  try{
+    if(name==='add_ledger'){
+      const type=args.type==='income'?'income':'expense';
+      const amt=Number(args.amount);
+      if(!isFinite(amt)||amt<=0)return{ok:false,summary:'金额无效'};
+      const rec={id:uid(),type,amount:+amt.toFixed(2),cat:String(args.cat||'其他').slice(0,12),date:/^\d{4}-\d{2}-\d{2}$/.test(args.date||'')?args.date:todayStr(),note:String(args.note||'').slice(0,60),created:Date.now()};
+      ledger.push(rec);saveLedger();renderLedger();
+      return{ok:true,summary:`记账 ${type==='income'?'收入':'支出'} ${rec.cat} ${fmtMoney(rec.amount)}（${rec.date}${rec.note?' '+rec.note:''}）`};
+    }
+    if(name==='add_task'){
+      const text=String(args.text||'').trim().slice(0,120);
+      if(!text)return{ok:false,summary:'待办内容为空'};
+      const t={id:uid(),text,note:'',done:false,created:Date.now()};
+      if(args.pri)t.pri=args.pri;
+      tasks.push(t);saveTasks();renderTasks();
+      return{ok:true,summary:`新增待办「${text}」`};
+    }
+    if(name==='complete_task'){
+      const key=String(args.text_contains||'').trim();
+      if(!key)return{ok:false,summary:'匹配词为空'};
+      const t=tasks.find(x=>!x.done&&x.text.indexOf(key)>-1);
+      if(!t)return{ok:false,summary:`未找到含「${key}」的未完成待办`};
+      t.done=true;t.doneAt=Date.now();saveTasks();renderTasks();
+      return{ok:true,summary:`已完成待办「${t.text}」`};
+    }
+    return{ok:false,summary:'未知工具 '+name};
+  }catch(e){return{ok:false,summary:String(e&&e.message||e)}}
+}
+async function aiCallLLM(messages,tools){
   const cfg=aiCfg;
   const P=aiProv(cfg.provider);
   const url=cfg.mode==='proxy'?(cfg.proxyUrl||'').trim():P.url;
@@ -3694,6 +3742,7 @@ async function aiCallLLM(messages){
   }
   const msgs=aiNormalizeMessages(messages,cfg.provider,model);
   const body={model,messages:msgs};
+  if(tools&&tools.length)body.tools=tools;
   const noTemp=(P.noTemp||[]).indexOf(model)>-1;
   if(!noTemp)body.temperature=0.7;
   if(cfg.mode==='proxy')body.provider=cfg.provider||'deepseek';
@@ -3711,9 +3760,11 @@ async function aiCallLLM(messages){
       throw new Error(aiFriendlyHttpError(r.status,txt));
     }
     const j=await r.json();
-    const c=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
-    if(!c)throw new Error('接口未返回内容');
-    return {content:String(c).trim(),model:(j&&j.model)||model,usage:j&&j.usage};
+    const m0=j&&j.choices&&j.choices[0]&&j.choices[0].message;
+    const c=m0&&m0.content;
+    const tcs=m0&&m0.tool_calls;
+    if(!c&&!(tcs&&tcs.length))throw new Error('接口未返回内容');
+    return {content:String(c||'').trim(),model:(j&&j.model)||model,tool_calls:tcs,usage:j&&j.usage};
   }finally{clearTimeout(tmo)}
 }
 const aiCallOpenAI=aiCallLLM; /* 兼容旧引用 */
@@ -3739,6 +3790,7 @@ async function aiSend(text,flow){
         '你是 Yichi 的私人 AI 助手，性格贴心、直接、带点幽默，用中文简体回复。',
         'Yichi 是比利时布鲁塞尔长期居民，也常在杭州活动；偏好安静逛吃、人文特色旅行；单文件 HTML 工作台是他自己维护的项目。',
         '回复控制在 300 字以内，除非明确要求长文。避免列表堆砌，多用自然段。',
+        '当用户要求记录/添加/完成某事（如记账、加待办、勾完成）时，必须调用工具真正写回工作台，不要只口头答应；写回后用一句话确认。回答数据类问题直接引用摘要【明细】块里的条目。',
         aiBuildContext()
       ].filter(Boolean).join('\n\n');
       const msgs=[{role:'system',content:sys}];
@@ -3747,9 +3799,22 @@ async function aiSend(text,flow){
         msgs.push({role:'system',content:`【工作流】${flow.label}\n【数据】\n${fdata}\n【指令】${flow.prompt}`});
       }
       aiChat.filter(m=>m.id!==botId&&!m.thinking&&!m.err&&m.model!=='demo').slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
-      const res=await aiCallLLM(msgs);
+      let res=await aiCallLLM(msgs,aiToolsEnabled(aiCfg.model||aiProv().defModel)?AI_TOOLS:null);
+      const doneTools=[];
+      let rounds=0;
+      while(res.tool_calls&&res.tool_calls.length&&rounds<2){
+        rounds++;
+        msgs.push({role:'assistant',content:res.content||'',tool_calls:res.tool_calls});
+        for(const tc of res.tool_calls){
+          const fn=tc.function||{};let a={};try{a=JSON.parse(fn.arguments||'{}')}catch(e){}
+          const out=aiExecTool(fn.name,a);
+          doneTools.push(out.summary);
+          msgs.push({role:'tool',tool_call_id:tc.id||('call_'+rounds+'_'+doneTools.length),content:out.ok?('已写回工作台：'+out.summary):('写入失败：'+out.summary)});
+        }
+        res=await aiCallLLM(msgs,null);
+      }
       const idx=aiChat.findIndex(m=>m.id===botId);
-      if(idx>-1){aiChat[idx]={...aiChat[idx],content:res.content,thinking:false,model:res.model||aiCfg.model};saveAiChat()}
+      if(idx>-1){aiChat[idx]={...aiChat[idx],content:res.content||'',thinking:false,model:res.model||aiCfg.model,tools:doneTools.length?doneTools:undefined};saveAiChat()}
     }
   }catch(e){
     const idx=aiChat.findIndex(m=>m.id===botId);
@@ -3775,6 +3840,7 @@ function aiOpenCfg(){
   const k=$('#aiKey');if(k)k.value=aiCfg.key||'';
   const p=$('#aiProxy');if(p)p.value=aiCfg.proxyUrl||'';
   const c=$('#aiCtx');if(c)c.checked=!!aiCfg.ctx;
+  const w=$('#aiWrite');if(w)w.checked=!!aiCfg.write;
   aiCfgSyncRows();
   openSheet('sheet-aicfg');
 }
@@ -3815,6 +3881,7 @@ document.addEventListener('click',e=>{
     aiCfg.key=($('#aiKey').value||'').trim();
     aiCfg.proxyUrl=($('#aiProxy').value||'').trim();
     aiCfg.ctx=$('#aiCtx').checked;
+    aiCfg.write=$('#aiWrite').checked;
     saveAiCfg();
     closeSheets();toast('AI 设置已保存');renderAI();return;
   }
@@ -3854,7 +3921,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.27.2';
+const WB_VER='1.28.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
