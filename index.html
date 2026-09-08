@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=29">
+<link rel="manifest" href="manifest.json?v=30">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -3651,6 +3651,14 @@ function aiBuildContext(){
   }catch(e){return ''}
 }
 
+function aiFriendlyHttpError(status,txt){
+  let msg='';try{const j=JSON.parse(txt);msg=(j&&j.error&&j.error.message)||''}catch(e){}
+  const low=String(msg||'').toLowerCase();
+  if(status===402||low.indexOf('insufficient balance')>-1)return '余额不足：DeepSeek 账户没钱了，去 platform.deepseek.com 充值后重试';
+  if(status===401||low.indexOf('authentication')>-1||low.indexOf('api key')>-1)return 'API Key 无效或已过期：到 ⚙️ 接入设置里检查或重填 Key';
+  if(status===429||low.indexOf('rate limit')>-1)return '触发限流或并发上限：稍等片刻再试';
+  return `HTTP ${status} ${(msg||txt).slice(0,160)}`;
+}
 function aiNormalizeMessages(messages,provider,model){
   const P=aiProv(provider);
   const noSys=(P.noSystem||[]).indexOf(model)>-1;
@@ -3692,10 +3700,15 @@ async function aiCallLLM(messages){
   const ctl=new AbortController();
   const tmo=setTimeout(()=>ctl.abort(),60000);
   try{
-    const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:ctl.signal});
+    let r;
+    try{
+      r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:ctl.signal});
+    }catch(netErr){
+      throw new Error('网络/CORS 失败：请求没发出去。办公网可能拦截该域名，换个人网络或改用 Edge Function 代理');
+    }
     if(!r.ok){
       const txt=await r.text().catch(()=>'');
-      throw new Error(`HTTP ${r.status} ${txt.slice(0,180)}`);
+      throw new Error(aiFriendlyHttpError(r.status,txt));
     }
     const j=await r.json();
     const c=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
@@ -3841,7 +3854,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.27.0';
+const WB_VER='1.27.1';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
