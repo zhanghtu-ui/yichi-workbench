@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=28">
+<link rel="manifest" href="manifest.json?v=29">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -911,7 +911,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 </div>
 
 <!-- 吃什么转盘 -->
-<!-- AI 助手设置弹窗（v1.26.0） -->
+<!-- AI 助手设置弹窗（v1.26.0，v1.27.0 加 provider 切换） -->
 <div class="sheet" id="sheet-aicfg">
   <div class="handle"></div>
   <div class="sheet-head">
@@ -920,8 +920,9 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <span style="width:44px"></span>
   </div>
   <div class="sheet-body">
+    <div class="field"><label>模型服务商</label><div class="chips" id="aiProviderChips"></div></div>
     <div class="field"><label>接入方式</label><div class="chips" id="aiModeChips"></div></div>
-    <div class="field" id="aiKeyRow"><label>OpenAI API Key</label><input id="aiKey" type="password" placeholder="sk-..." autocomplete="off"></div>
+    <div class="field" id="aiKeyRow"><label id="aiKeyLabel">API Key</label><input id="aiKey" type="password" placeholder="sk-..." autocomplete="off"></div>
     <div class="field" id="aiProxyRow" style="display:none"><label>Edge Function URL</label><input id="aiProxy" type="text" placeholder="https://xxx.supabase.co/functions/v1/wb-ai" autocomplete="off"></div>
     <div class="field"><label>模型</label><div class="chips" id="aiModelChips"></div></div>
     <label class="pack-row" style="margin:0 0 12px"><input type="checkbox" id="aiCtx" checked><span>发送时附带工作台数据摘要（消耗更多 token）</span></label>
@@ -1133,7 +1134,8 @@ function renderSub(){
     el.textContent=`倒数日 · 共 ${events.length} 个`+(n?' · 最近 '+n.title+' '+(n.days===0?'今天 🎉':n.days>0?n.days+' 天后':'已过 '+(-n.days)+' 天'):'');
   }else if(curTab==='ai'){
     const okCfg=aiCfg.mode==='direct'?!!aiCfg.key:!!aiCfg.proxyUrl;
-    el.textContent=`AI 助手 · ${okCfg?'已接入 '+(aiCfg.model||'gpt-4o-mini'):'未配置（演示模式）'} · ${aiChat.length} 条对话`;
+    const pname=aiProv().name;
+    el.textContent=`AI 助手 · ${okCfg?'已接入 '+pname+' · '+(aiCfg.model||aiProv().defModel):'未配置（演示模式）'} · ${aiChat.length} 条对话`;
   }else{
     const m=todayStr().slice(0,7);
     el.textContent=`运动 · 本月 ${sports.filter(r=>r.date.startsWith(m)).length} 次`;
@@ -3517,13 +3519,20 @@ let aiChat=store.get('wb.aiChat',[]);          /* [{id,role,content,ts,flow,mode
 const saveAiChat=()=>store.set('wb.aiChat',aiChat);
 if(!Array.isArray(aiChat))aiChat=[];
 aiChat=aiChat.filter(m=>m&&typeof m.role==='string'&&typeof m.content==='string');
-let aiCfg=store.get('wb.aiCfg',null);          /* {mode:'direct'|'proxy',key,proxyUrl,model,ctx} —— 仅本机，不云同步 */
-if(!aiCfg||typeof aiCfg!=='object')aiCfg={mode:'direct',key:'',proxyUrl:'',model:'gpt-4o-mini',ctx:true};
-if(!aiCfg.model)aiCfg.model='gpt-4o-mini';
+let aiCfg=store.get('wb.aiCfg',null);          /* {provider,mode,key,proxyUrl,model,ctx} —— 仅本机，不云同步 */
+if(!aiCfg||typeof aiCfg!=='object')aiCfg={provider:'deepseek',mode:'direct',key:'',proxyUrl:'',model:'deepseek-chat',ctx:true};
+(()=>{const _pm={deepseek:['deepseek-chat','deepseek-reasoner'],openai:['gpt-4o-mini','gpt-4o','o4-mini']};
+if(!aiCfg.provider||!_pm[aiCfg.provider])aiCfg.provider='deepseek';
+if(_pm[aiCfg.provider].indexOf(aiCfg.model)<0)aiCfg.model=_pm[aiCfg.provider][0];})();
 const saveAiCfg=()=>store.set('wb.aiCfg',aiCfg);
 let aiBusy=false;
 
-const AI_MODELS=['gpt-4o-mini','gpt-4o','o4-mini'];
+const AI_PROVIDERS={
+  deepseek:{name:'DeepSeek',tag:'🐋 DeepSeek',url:'https://api.deepseek.com/chat/completions',models:['deepseek-chat','deepseek-reasoner'],defModel:'deepseek-chat',keyLabel:'DeepSeek API Key',noSystem:['deepseek-reasoner'],noTemp:['deepseek-reasoner']},
+  openai:{name:'OpenAI',tag:'🧠 OpenAI',url:'https://api.openai.com/v1/chat/completions',models:['gpt-4o-mini','gpt-4o','o4-mini'],defModel:'gpt-4o-mini',keyLabel:'OpenAI API Key',noSystem:[],noTemp:['o4-mini','o3-mini']}
+};
+function aiProv(p){return AI_PROVIDERS[p||aiCfg.provider]||AI_PROVIDERS.deepseek}
+const AI_MODELS=aiProv().models;
 const AI_FLOWS=[
   {id:'ledger',ic:'💰',label:'分析本月支出',build:()=>{
     const m=todayStr().slice(0,7);
@@ -3567,8 +3576,9 @@ const AI_FLOWS=[
 
 function aiHeroHtml(){
   const okCfg=aiCfg.mode==='direct'?!!aiCfg.key:!!aiCfg.proxyUrl;
-  const modeTxt=aiCfg.mode==='direct'?'直连 OpenAI':'Edge Function 代理';
-  const modelTxt=aiCfg.model||'gpt-4o-mini';
+  const pname=aiProv().name;
+  const modeTxt=aiCfg.mode==='direct'?('直连 '+pname):'Edge Function 代理';
+  const modelTxt=aiCfg.model||aiProv().defModel;
   return `<div class="ai-hero">
     <div class="ai-title">🪄 AI 助手 · Yichi 专属</div>
     <div class="ai-sub">${okCfg?`已接入 <b>${modeTxt}</b> · 模型 <b>${esc(modelTxt)}</b> · ${aiCfg.ctx?'附带工作台数据摘要':'仅对话（不附带数据）'}`:'尚未配置 API，当前为 <b>本地演示模式</b>（发送会返回模拟回复，不消耗 token）'}</div>
@@ -3641,16 +3651,32 @@ function aiBuildContext(){
   }catch(e){return ''}
 }
 
-async function aiCallOpenAI(messages){
+function aiNormalizeMessages(messages,provider,model){
+  const P=aiProv(provider);
+  const noSys=(P.noSystem||[]).indexOf(model)>-1;
+  if(!noSys)return messages;
+  /* deepseek-reasoner：把 system 折进首个 user 消息 */
+  const sysParts=[];const rest=[];
+  messages.forEach(m=>{if(m.role==='system')sysParts.push(m.content);else rest.push(m)});
+  if(!sysParts.length)return rest;
+  const sysBlock=sysParts.join('\n\n');
+  let idx=rest.findIndex(m=>m.role==='user');
+  if(idx<0){rest.unshift({role:'user',content:sysBlock});return rest}
+  rest[idx]={role:'user',content:sysBlock+'\n\n'+rest[idx].content};
+  return rest;
+}
+async function aiCallLLM(messages){
   const cfg=aiCfg;
-  const url=cfg.mode==='proxy'?(cfg.proxyUrl||'').trim():'https://api.openai.com/v1/chat/completions';
+  const P=aiProv(cfg.provider);
+  const url=cfg.mode==='proxy'?(cfg.proxyUrl||'').trim():P.url;
   if(!url)throw new Error('未配置 API 地址');
+  const model=cfg.model||P.defModel;
   const headers={'Content-Type':'application/json'};
   if(cfg.mode==='direct'){
-    if(!cfg.key)throw new Error('未配置 OpenAI API Key');
+    if(!cfg.key)throw new Error('未配置 '+P.name+' API Key');
     headers['Authorization']='Bearer '+cfg.key;
   }else{
-    /* 代理模式：若已登录 Supabase，附带 session token 供 Edge Function 验签 */
+    /* 代理模式：附带 Supabase session token 供 Edge Function 验签 */
     try{
       if(window.__wbSb&&window.__wbSb.client){
         const {data}=await window.__wbSb.client.auth.getSession();
@@ -3658,9 +3684,13 @@ async function aiCallOpenAI(messages){
       }
     }catch(e){}
   }
-  const body={model:cfg.model||'gpt-4o-mini',messages,temperature:0.7};
+  const msgs=aiNormalizeMessages(messages,cfg.provider,model);
+  const body={model,messages:msgs};
+  const noTemp=(P.noTemp||[]).indexOf(model)>-1;
+  if(!noTemp)body.temperature=0.7;
+  if(cfg.mode==='proxy')body.provider=cfg.provider||'deepseek';
   const ctl=new AbortController();
-  const tmo=setTimeout(()=>ctl.abort(),45000);
+  const tmo=setTimeout(()=>ctl.abort(),60000);
   try{
     const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:ctl.signal});
     if(!r.ok){
@@ -3670,9 +3700,10 @@ async function aiCallOpenAI(messages){
     const j=await r.json();
     const c=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
     if(!c)throw new Error('接口未返回内容');
-    return {content:String(c).trim(),model:(j&&j.model)||cfg.model||'',usage:j&&j.usage};
+    return {content:String(c).trim(),model:(j&&j.model)||model,usage:j&&j.usage};
   }finally{clearTimeout(tmo)}
 }
+const aiCallOpenAI=aiCallLLM; /* 兼容旧引用 */
 
 async function aiSend(text,flow){
   text=(text||'').trim();
@@ -3687,7 +3718,7 @@ async function aiSend(text,flow){
   try{
     if(!okCfg){
       await new Promise(r=>setTimeout(r,700));
-      const reply=`【演示模式】我收到你说：「${text}」\n\n要让我真正干活，请点上方 ⚙️ 接入设置，填入 OpenAI API Key（直连模式），或部署 Edge Function 后填代理 URL。\n\n这条回复没有消耗任何 token。`;
+      const reply=`【演示模式】我收到你说：「${text}」\n\n要让我真正干活，请点上方 ⚙️ 接入设置，选择模型服务商（DeepSeek / OpenAI）并填入 API Key（直连模式），或部署 Edge Function 后填代理 URL。\n\n这条回复没有消耗任何 token。`;
       const idx=aiChat.findIndex(m=>m.id===botId);
       if(idx>-1){aiChat[idx]={...aiChat[idx],content:reply,thinking:false,model:'demo'};saveAiChat()}
     }else{
@@ -3703,7 +3734,7 @@ async function aiSend(text,flow){
         msgs.push({role:'system',content:`【工作流】${flow.label}\n【数据】\n${fdata}\n【指令】${flow.prompt}`});
       }
       aiChat.filter(m=>m.id!==botId&&!m.thinking&&!m.err).slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
-      const res=await aiCallOpenAI(msgs);
+      const res=await aiCallLLM(msgs);
       const idx=aiChat.findIndex(m=>m.id===botId);
       if(idx>-1){aiChat[idx]={...aiChat[idx],content:res.content,thinking:false,model:res.model||aiCfg.model};saveAiChat()}
     }
@@ -3719,10 +3750,15 @@ async function aiSend(text,flow){
 
 /* --- AI 设置弹窗 --- */
 function aiOpenCfg(){
+  const pChips=$('#aiProviderChips');
+  if(pChips)pChips.innerHTML=Object.keys(AI_PROVIDERS).map(k=>{
+    const P=AI_PROVIDERS[k];
+    return `<span class="chip ${aiCfg.provider===k?'on':''}" data-provider="${k}">${P.tag}</span>`;
+  }).join('');
   const modeChips=$('#aiModeChips');
-  if(modeChips)modeChips.innerHTML=[['direct','🔑 直连 OpenAI'],['proxy','🔀 Edge Function 代理']].map(([v,l])=>`<span class="chip ${aiCfg.mode===v?'on':''}" data-mode="${v}">${l}</span>`).join('');
+  if(modeChips)modeChips.innerHTML=[['direct','🔑 直连 API'],['proxy','🔀 Edge Function 代理']].map(([v,l])=>`<span class="chip ${aiCfg.mode===v?'on':''}" data-mode="${v}">${l}</span>`).join('');
   const modelChips=$('#aiModelChips');
-  if(modelChips)modelChips.innerHTML=AI_MODELS.map(m=>`<span class="chip ${aiCfg.model===m?'on':''}" data-model="${m}">${m}</span>`).join('');
+  if(modelChips)modelChips.innerHTML=aiProv().models.map(m=>`<span class="chip ${aiCfg.model===m?'on':''}" data-model="${m}">${m}</span>`).join('');
   const k=$('#aiKey');if(k)k.value=aiCfg.key||'';
   const p=$('#aiProxy');if(p)p.value=aiCfg.proxyUrl||'';
   const c=$('#aiCtx');if(c)c.checked=!!aiCfg.ctx;
@@ -3733,8 +3769,23 @@ function aiCfgSyncRows(){
   const direct=aiCfg.mode!=='proxy';
   const kr=$('#aiKeyRow');if(kr)kr.style.display=direct?'':'none';
   const pr=$('#aiProxyRow');if(pr)pr.style.display=direct?'none':'';
+  const lbl=$('#aiKeyLabel');if(lbl)lbl.textContent=aiProv().keyLabel;
+  const modelChips=$('#aiModelChips');
+  if(modelChips)modelChips.innerHTML=aiProv().models.map(m=>`<span class="chip ${aiCfg.model===m?'on':''}" data-model="${m}">${m}</span>`).join('');
 }
 document.addEventListener('click',e=>{
+  const pc=e.target.closest('#aiProviderChips [data-provider]');
+  if(pc){
+    const np=pc.dataset.provider;
+    if(np!==aiCfg.provider){
+      aiCfg.provider=np;
+      const P=aiProv(np);
+      /* 切换 provider 时若当前模型不在新 provider 列表内，回退到默认模型 */
+      if(P.models.indexOf(aiCfg.model)<0)aiCfg.model=P.defModel;
+    }
+    $$('#aiProviderChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.provider===aiCfg.provider));
+    aiCfgSyncRows();return;
+  }
   const mc=e.target.closest('#aiModeChips [data-mode]');
   if(mc){
     aiCfg.mode=mc.dataset.mode;
@@ -3790,7 +3841,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.26.0';
+const WB_VER='1.27.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
