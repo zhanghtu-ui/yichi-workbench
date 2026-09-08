@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=30">
+<link rel="manifest" href="manifest.json?v=31">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -3746,7 +3746,7 @@ async function aiSend(text,flow){
         let fdata='';try{fdata=flow.build()}catch(e){fdata='（数据构建失败：'+(e&&e.message||e)+'）'}
         msgs.push({role:'system',content:`【工作流】${flow.label}\n【数据】\n${fdata}\n【指令】${flow.prompt}`});
       }
-      aiChat.filter(m=>m.id!==botId&&!m.thinking&&!m.err).slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
+      aiChat.filter(m=>m.id!==botId&&!m.thinking&&!m.err&&m.model!=='demo').slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
       const res=await aiCallLLM(msgs);
       const idx=aiChat.findIndex(m=>m.id===botId);
       if(idx>-1){aiChat[idx]={...aiChat[idx],content:res.content,thinking:false,model:res.model||aiCfg.model};saveAiChat()}
@@ -3854,7 +3854,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.27.1';
+const WB_VER='1.27.2';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ================= 初始化 ================= */
