@@ -1,5 +1,5 @@
 /* Yichiの工作台 · 离线壳 Service Worker（v1.18.0 引入） */
-const CACHE = 'ycwb-v19';
+const CACHE = 'ycwb-v20';
 const CORE = ['./', './index.html', './manifest.json', './k3-192.png', './k3-512.png'];
 
 self.addEventListener('install', e => {
@@ -14,9 +14,19 @@ self.addEventListener('activate', e => {
   );
 });
 
+/* v1.30.0：页面请求立即接管新版本 */
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
+  /* v1.30.0：ver.json 永远走网络、绝不缓存（版本巡检要拿到最新值） */
+  if (u.pathname.endsWith('/ver.json')) {
+    e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(() => new Response('null', { headers: { 'Content-Type': 'application/json' } })));
+    return;
+  }
   /* 页面导航：网络优先，失败回退缓存（离线秒开） */
   if (e.request.mode === 'navigate') {
     e.respondWith(

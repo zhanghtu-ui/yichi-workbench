@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=33">
+<link rel="manifest" href="manifest.json?v=34">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -378,6 +378,11 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .ai-hero .ai-sub b{color:var(--sky)}
 .ai-cfg-btn{margin-top:10px;display:inline-block;padding:6px 12px;background:rgba(255,111,181,.16);border:1px solid rgba(255,111,181,.42);border-radius:20px;font-size:12px;color:var(--sky);cursor:pointer;font-weight:600}
 .ai-cfg-btn:active{transform:scale(.96)}
+.ai-usage{margin-top:10px}
+.ai-usage-line{font-size:11.5px;color:var(--label2);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ai-usage-line b{color:var(--sky);font-weight:700}
+.ai-usage-bar{margin-top:5px;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.ai-usage-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#FF6FB5,#9D6BFF);transition:width .4s ease}
 .ai-flows{display:flex;flex-wrap:wrap;gap:8px;padding:2px}
 .ai-flow-chip{padding:8px 12px;background:var(--card);border:1px solid var(--sep);border-radius:20px;font-size:12.5px;color:var(--label);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .ai-flow-chip:active{transform:scale(.96);border-color:var(--sky);color:var(--sky)}
@@ -397,6 +402,8 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .ai-send-btn{flex:none;width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--sky),var(--sky-deep));color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;box-shadow:0 2px 8px rgba(255,111,181,.35)}
 .ai-send-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .ai-send-btn:active:not(:disabled){transform:scale(.94)}
+.ai-send-btn.stop{background:linear-gradient(135deg,#FF6B6B,#C73E3E);animation:stopPulse 1.2s ease-in-out infinite}
+@keyframes stopPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,107,.5)}50%{box-shadow:0 0 0 6px rgba(255,107,107,0)}}
 .ai-empty{text-align:center;padding:28px 12px;color:var(--label2);font-size:13px;line-height:1.7}
 .ai-empty .kuromi{font-size:34px;margin-bottom:6px;opacity:.7}
 </style>
@@ -924,6 +931,9 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     </div>
     <input type="file" id="bkFile" accept=".json,application/json" style="display:none">
     <div class="acc-sub" style="margin-top:8px;text-align:center">导出为 JSON 文件，换设备时导入即可恢复全部数据</div>
+    <div class="sec-l" style="margin-top:18px"><span>诊断</span></div>
+    <button class="btn" id="diagCopy" style="background:var(--ink);color:var(--label)">📋 复制诊断日志</button>
+    <div class="acc-sub" style="margin-top:8px;text-align:center">出问题时复制这段日志（最近 50 条错误 / 同步 / AI 事件）发给开发者</div>
     <div class="acc-sub" id="verLine" style="margin-top:16px;text-align:center;color:#6E5F7E"></div>
   </div>
 </div>
@@ -2760,10 +2770,10 @@ const Sync={
       try{
         await SbBackend.push(withMeta);commit();SbBackend.heartbeat(this.deviceId);
         if(this.hasIc)IcBackend.push(withMeta).catch(()=>{});   /* iCloud 辅助补写：尽力而为 */
-      }catch(e){fail()}
+      }catch(e){wbDiag('SYNC','push(sb) 失败：'+(e&&e.message||e));fail()}
       return;
     }
-    if(this.hasIc){try{await IcBackend.push(withMeta);commit()}catch(e){fail()}}
+    if(this.hasIc){try{await IcBackend.push(withMeta);commit()}catch(e){wbDiag('SYNC','push(ic) 失败：'+(e&&e.message||e));fail()}}
   },
   stampSynced(keys){this.merging=true;for(const k of keys){if(k==='wb.pantry')continue;const arr=ARR()[k];(arr||[]).forEach(it=>{if(it&&typeof it==='object')it._sync='synced'});store.set(k,arr)}this.merging=false},
   /* ---- 拉取合并：顺序 = Supabase 主拉取 → iCloud 补充检查 ----
@@ -2782,10 +2792,10 @@ const Sync={
           if(this.docUt===0&&(ARR()['wb.pantry']||[]).length){this.docUt=Date.now();this.merging=true;store.set('wb.pantryUt',this.docUt);this.merging=false}
         }
         n+=this.mergeFrom(rows,'sb');
-      }catch(e){err=true}
+      }catch(e){wbDiag('SYNC','pull(sb) 失败：'+(e&&e.message||e));err=true}
     }
     if(this.hasIc){
-      try{n+=this.mergeFrom(await IcBackend.pull(),'ic')}catch(e){if(!this.hasSb)err=true}
+      try{n+=this.mergeFrom(await IcBackend.pull(),'ic')}catch(e){wbDiag('SYNC','pull(ic) 失败：'+(e&&e.message||e));if(!this.hasSb)err=true}
     }
     if(err){this.setChip('error');return}
     this.setChip('synced');
@@ -3743,6 +3753,32 @@ const AI_FLOWS=[
   },prompt:'用不超过 60 字给我今天的表现打个分（0-10）并给一句明日建议，语气毒舌但善意。'},
 ];
 
+/* ---- v1.30.0 token / 费用看板：累计用量独立于对话存储，清空对话不清零 ---- */
+let aiUsage=store.get('wb.aiUsage',null)||{p:0,c:0,t:0};
+function aiSaveUsage(){store.set('wb.aiUsage',aiUsage)}
+function aiAddUsage(u){
+  if(!u)return;
+  const p=u.prompt_tokens||0,c=u.completion_tokens||0;
+  aiUsage.p+=p;aiUsage.c+=c;aiUsage.t+=(u.total_tokens||0)||(p+c);
+  aiSaveUsage();
+}
+const AI_PRICE={'deepseek-chat':{in:1,out:2},'deepseek-reasoner':{in:4,out:16}};   /* ¥ / 百万 token */
+function aiCostCNY(){
+  const m=aiCfg.model||aiProv().defModel;
+  const pr=AI_PRICE[m]||AI_PRICE['deepseek-chat'];
+  return (aiUsage.p/1e6)*pr.in+(aiUsage.c/1e6)*pr.out;
+}
+function aiFmtMoneyTiny(v){return v<0.01?('¥'+v.toFixed(4)):('¥'+v.toFixed(2))}
+function aiUsageHtml(){
+  const GOAL=1e8;
+  const pct=Math.min(100,(aiUsage.t/GOAL)*100);
+  const pctTxt=(pct<0.01&&aiUsage.t>0)?'&lt;0.01':pct.toFixed(2);
+  const w=Math.max(pct,(aiUsage.t>0?0.5:0));
+  return `<div class="ai-usage">
+    <div class="ai-usage-line">📊 累计 <b>${aiUsage.t.toLocaleString()}</b> token（入 ${aiUsage.p.toLocaleString()} / 出 ${aiUsage.c.toLocaleString()}）· 约 <b>${aiFmtMoneyTiny(aiCostCNY())}</b> · 一亿目标 <b>${pctTxt}%</b></div>
+    <div class="ai-usage-bar"><i style="width:${w}%"></i></div>
+  </div>`;
+}
 function aiHeroHtml(){
   const okCfg=aiCfg.mode==='direct'?!!aiCfg.key:!!aiCfg.proxyUrl;
   const pname=aiProv().name;
@@ -3751,6 +3787,7 @@ function aiHeroHtml(){
   return `<div class="ai-hero">
     <div class="ai-title">🪄 AI 助手 · Yichi 专属</div>
     <div class="ai-sub">${okCfg?`已接入 <b>${modeTxt}</b> · 模型 <b>${esc(modelTxt)}</b> · ${aiCfg.ctx?'附带工作台数据摘要':'仅对话（不附带数据）'}`:'尚未配置 API，当前为 <b>本地演示模式</b>（发送会返回模拟回复，不消耗 token）'}</div>
+    ${aiUsageHtml()}
     <span class="ai-cfg-btn" data-act="ai-cfg">⚙️ 接入设置</span>
   </div>`;
 }
@@ -3764,7 +3801,7 @@ function aiMsgHtml(m){
   const flowTag=m.flow?`<span style="opacity:.7;font-size:11px">· ${esc(m.flow)}</span>\n`:'';
   const body=m.thinking&&!m.content?'思考中…':esc(m.content||'');
   const toolsTag=(m.tools&&m.tools.length)?`<span style="display:block;font-size:11px;opacity:.85;margin-bottom:4px">🛠 已写回：${esc(m.tools.join('；'))}</span>`:'';
-  return `<div class="${cls}">${flowTag}${toolsTag}${body}<span class="ts">${hh}:${mm}${m.model?' · '+esc(m.model):''}</span></div>`;
+  return `<div class="${cls}" id="aim-${m.id}">${flowTag}${toolsTag}<span class="ai-body" id="aib-${m.id}">${body}</span><span class="ts">${hh}:${mm}${m.model?' · '+esc(m.model):''}${m.stopped?' · 已停止':''}</span></div>`;
 }
 function aiChatHtml(){
   if(!aiChat.length)return `<div class="ai-empty"><div class="kuromi">🪄</div>还没有对话，试试上面的快捷工作流<br>或直接输入你的问题</div>`;
@@ -3773,7 +3810,7 @@ function aiChatHtml(){
 function aiInputHtml(){
   return `<div class="ai-input-bar">
     <textarea id="aiInputBox" placeholder="问我任何事…（Enter 发送）" rows="1"></textarea>
-    <button class="ai-send-btn" id="aiSendBtn" ${aiBusy?'disabled':''} aria-label="发送">➤</button>
+    ${aiBusy?'<button class="ai-send-btn stop" id="aiStopBtn" aria-label="停止生成">⏹</button>':'<button class="ai-send-btn" id="aiSendBtn" aria-label="发送">➤</button>'}
   </div>`;
 }
 function aiAutoGrow(t){if(!t)return;t.style.height='auto';t.style.height=Math.min(120,Math.max(40,t.scrollHeight))+'px'}
@@ -4040,7 +4077,9 @@ function aiExecTool(name,args){
     return{ok:false,summary:'未知工具 '+name};
   }catch(e){return{ok:false,summary:String(e&&e.message||e)}}
 }
-async function aiCallLLM(messages,tools){
+let aiAbort=null;   /* v1.30.0 当前在飞的请求 AbortController（停止按钮用） */
+async function aiCallLLM(messages,tools,opt){
+  opt=opt||{};
   const cfg=aiCfg;
   const P=aiProv(cfg.provider);
   const url=cfg.mode==='proxy'?(cfg.proxyUrl||'').trim():P.url;
@@ -4065,26 +4104,79 @@ async function aiCallLLM(messages,tools){
   const noTemp=(P.noTemp||[]).indexOf(model)>-1;
   if(!noTemp)body.temperature=0.7;
   if(cfg.mode==='proxy')body.provider=cfg.provider||'deepseek';
+  /* v1.30.0：直连且给了 onDelta 才走流式（Edge Function 暂不透传 SSE） */
+  const wantStream=!!(opt.onDelta&&cfg.mode==='direct');
+  if(wantStream)body.stream=true;
   const ctl=new AbortController();
-  const tmo=setTimeout(()=>ctl.abort(),60000);
-  try{
-    let r;
-    try{
-      r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:ctl.signal});
-    }catch(netErr){
-      throw new Error('网络/CORS 失败：请求没发出去。办公网可能拦截该域名，换个人网络或改用 Edge Function 代理');
-    }
-    if(!r.ok){
-      const txt=await r.text().catch(()=>'');
-      throw new Error(aiFriendlyHttpError(r.status,txt));
-    }
-    const j=await r.json();
+  aiAbort=ctl;
+  const tmo=setTimeout(()=>ctl.abort(),90000);
+  const finishParse=(j)=>{
     const m0=j&&j.choices&&j.choices[0]&&j.choices[0].message;
     const c=m0&&m0.content;
     const tcs=m0&&m0.tool_calls;
     if(!c&&!(tcs&&tcs.length))throw new Error('接口未返回内容');
     return {content:String(c||'').trim(),model:(j&&j.model)||model,tool_calls:tcs,usage:j&&j.usage};
-  }finally{clearTimeout(tmo)}
+  };
+  try{
+    let r;
+    try{
+      r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:ctl.signal});
+    }catch(netErr){
+      if(ctl.signal.aborted)return {content:'',model,stopped:true,usage:null};
+      wbDiag('AI','网络/CORS：'+(netErr&&netErr.message||netErr));throw new Error('网络/CORS 失败：请求没发出去。办公网可能拦截该域名，换个人网络或改用 Edge Function 代理');
+    }
+    if(!r.ok){
+      const txt=await r.text().catch(()=>'');
+      wbDiag('AI','HTTP '+r.status+'：'+aiFriendlyHttpError(r.status,txt).slice(0,120));throw new Error(aiFriendlyHttpError(r.status,txt));
+    }
+    const ct=(r.headers&&r.headers.get&&r.headers.get('content-type'))||'';
+    if(!wantStream||!r.body||!r.body.getReader||ct.indexOf('text/event-stream')<0)return finishParse(await r.json());
+    /* ---- SSE 流式解析 ---- */
+    const reader=r.body.getReader();
+    const dec=new TextDecoder();
+    let buf='',content='',model2=model,usage=null,stop=false;
+    const tcAcc={};
+    const pump=async()=>{
+      while(true){
+        const st=await reader.read();
+        if(st.done)break;
+        buf+=dec.decode(st.value,{stream:true});
+        let nl;
+        while((nl=buf.indexOf('\n'))>-1){
+          const line=buf.slice(0,nl).trim();
+          buf=buf.slice(nl+1);
+          if(!line||line.indexOf('data:')!==0)continue;
+          const data=line.slice(5).trim();
+          if(data==='[DONE]')continue;
+          let j;try{j=JSON.parse(data)}catch(e){continue}
+          if(j.model)model2=j.model;
+          if(j.usage)usage=j.usage;
+          const ch=j.choices&&j.choices[0];
+          if(!ch)continue;
+          const dl=ch.delta||{};
+          if(dl.content){content+=dl.content;if(opt.onDelta)opt.onDelta(content)}
+          if(dl.tool_calls)dl.tool_calls.forEach(tc=>{
+            const i=tc.index||0;
+            if(!tcAcc[i])tcAcc[i]={id:'',type:'function','function':{name:'',arguments:''}};
+            if(tc.id)tcAcc[i].id=tc.id;
+            if(tc.type)tcAcc[i].type=tc.type;
+            if(tc.function){
+              if(tc.function.name)tcAcc[i].function.name+=tc.function.name;
+              if(tc.function.arguments)tcAcc[i].function.arguments+=tc.function.arguments;
+            }
+          });
+        }
+      }
+    };
+    try{
+      await pump();
+    }catch(readErr){
+      if(ctl.signal.aborted){stop=true}else{throw readErr}
+    }
+    const tcs=Object.keys(tcAcc).sort((a,b)=>(+a)-(+b)).map(k=>tcAcc[k]).filter(t=>t.function.name);
+    if(!content&&!tcs.length&&!stop)throw new Error('接口未返回内容');
+    return {content:content.trim(),model:model2,tool_calls:tcs.length?tcs:undefined,usage,stopped:stop||undefined};
+  }finally{clearTimeout(tmo);if(aiAbort===ctl)aiAbort=null}
 }
 const aiCallOpenAI=aiCallLLM; /* 兼容旧引用 */
 
@@ -4143,6 +4235,7 @@ async function aiSuggest(force){
     const sys='你是 Yichi 的私人助理。基于下方工作台数据，用一句 20-40 字的中文建议 Yichi 今天可以做什么。要求：具体、可执行、温柔，不要开场白，不要列表，不要解释，直接一句话。';
     const msgs=[{role:'system',content:sys+'\n\n'+dataLines},{role:'user',content:'给我今天的建议'}];
     const r=await aiCallLLM(msgs,null);
+    aiAddUsage(r.usage);
     let txt=(r.content||'').trim().replace(/^["'「『\s]+|["'」』\s]+$/g,'').split('\n')[0].slice(0,80);
     if(!txt)txt='今天先喝杯水，看看待办列表挑一件最容易的做。';
     aiSug={ts:Date.now(),text:txt};saveAiSug();
@@ -4154,10 +4247,20 @@ async function aiSuggest(force){
   }
 }
 
+function aiLiveUpdate(botId,txt){
+  const b=document.getElementById('aib-'+botId);
+  if(b){
+    b.textContent=txt;
+    const md=b.closest('.ai-msg');
+    if(md)md.classList.remove('thinking');
+    const c2=document.getElementById('aiChat');
+    if(c2&&c2.lastElementChild)c2.lastElementChild.scrollIntoView({block:'end'});
+  }
+}
 async function aiSend(text,flow){
   text=(text||'').trim();
   if(!text||aiBusy)return;
-  aiBusy=true;
+  aiBusy=true;renderAI();
   const userMsg={id:uid(),role:'user',content:text,ts:Date.now(),flow:flow?flow.label:''};
   aiChat.push(userMsg);saveAiChat();renderAI();
   const botId=uid();
@@ -4184,10 +4287,11 @@ async function aiSend(text,flow){
         msgs.push({role:'system',content:`【工作流】${flow.label}\n【数据】\n${fdata}\n【指令】${flow.prompt}`});
       }
       aiChat.filter(m=>m.id!==botId&&!m.thinking&&!m.err&&m.model!=='demo').slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
-      let res=await aiCallLLM(msgs,aiToolsEnabled(aiCfg.model||aiProv().defModel)?AI_TOOLS:null);
+      let res=await aiCallLLM(msgs,aiToolsEnabled(aiCfg.model||aiProv().defModel)?AI_TOOLS:null,{onDelta:t=>aiLiveUpdate(botId,t)});
+      aiAddUsage(res.usage);
       const doneTools=[];
       let rounds=0;
-      while(res.tool_calls&&res.tool_calls.length&&rounds<2){
+      while(res.tool_calls&&res.tool_calls.length&&rounds<2&&!res.stopped){
         rounds++;
         msgs.push({role:'assistant',content:res.content||'',tool_calls:res.tool_calls});
         for(const tc of res.tool_calls){
@@ -4196,12 +4300,14 @@ async function aiSend(text,flow){
           doneTools.push(out.summary);
           msgs.push({role:'tool',tool_call_id:tc.id||('call_'+rounds+'_'+doneTools.length),content:out.ok?('已写回工作台：'+out.summary):('写入失败：'+out.summary)});
         }
-        res=await aiCallLLM(msgs,null);
+        res=await aiCallLLM(msgs,null,{onDelta:t=>aiLiveUpdate(botId,t)});
+        aiAddUsage(res.usage);
       }
       const idx=aiChat.findIndex(m=>m.id===botId);
-      if(idx>-1){aiChat[idx]={...aiChat[idx],content:res.content||'',thinking:false,model:res.model||aiCfg.model,tools:doneTools.length?doneTools:undefined};saveAiChat()}
+      if(idx>-1){aiChat[idx]={...aiChat[idx],content:res.content||'',thinking:false,model:res.model||aiCfg.model,tools:doneTools.length?doneTools:undefined,stopped:res.stopped||undefined,usage:res.usage||undefined};saveAiChat()}
     }
   }catch(e){
+    wbDiag('AI','aiSend 异常：'+(e&&e.message||e));
     const idx=aiChat.findIndex(m=>m.id===botId);
     if(idx>-1){aiChat[idx]={...aiChat[idx],content:'⚠️ '+(e&&e.message||e),thinking:false,err:true};saveAiChat()}
   }finally{
@@ -4290,6 +4396,10 @@ document.addEventListener('click',e=>{
     if(f)aiSend(f.prompt,f);
     return;
   }
+  if(e.target.closest('#aiStopBtn')){
+    if(aiAbort){aiAbort.abort();toast('已停止生成')}
+    return;
+  }
   if(e.target.closest('#aiSendBtn')){
     const box=$('#aiInputBox');
     if(box&&box.value.trim()){
@@ -4326,8 +4436,71 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.29.0';
+const WB_VER='1.30.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
+
+/* ---- v1.30.0 新版本提示横幅：线上 ver.json 比本地新 / SW 换控制器 时提示重启 ---- */
+function wbVerCmp(a,b){
+  const pa=String(a).split('.').map(n=>parseInt(n,10)||0),pb=String(b).split('.').map(n=>parseInt(n,10)||0);
+  for(let i=0;i<3;i++){const d=(pa[i]||0)-(pb[i]||0);if(d)return d>0?1:-1}
+  return 0;
+}
+function wbForceReload(){
+  try{
+    if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+      navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>{if(r.waiting)r.waiting.postMessage({type:'SKIP_WAITING'})}));
+    }
+  }catch(e){}
+  try{if(window.caches&&caches.keys)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k)))}catch(e){}
+  setTimeout(()=>location.reload(),150);
+}
+let wbVerBannerShown=false;
+function wbVerBanner(ver){
+  if(wbVerBannerShown)return; wbVerBannerShown=true;
+  let b=document.getElementById('wbVerBanner');
+  if(!b){
+    b=document.createElement('div');b.id='wbVerBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99998;display:none;align-items:center;'+
+      'justify-content:center;gap:6px;padding:11px 14px;background:linear-gradient(135deg,#FF6FB5,#9D6BFF);'+
+      'color:#fff;font-size:13px;font-weight:700;text-align:center;cursor:pointer;'+
+      'box-shadow:0 3px 14px rgba(0,0,0,.45);letter-spacing:.3px';
+    b.setAttribute('role','button');
+    b.onclick=()=>wbForceReload();
+    document.body.appendChild(b);
+  }
+  b.textContent='🎉 '+(ver?('v'+ver+' 已就绪'):'新版本已就绪')+' · 点按重启生效';
+  b.style.display='flex';
+}
+let wbVerLastCheck=0;
+/* ---- v1.30.0 端上诊断日志：环形缓冲 50 条 + localStorage 持久化 + 一键复制 ---- */
+const WB_DIAG_MAX=50;
+let wbDiagBuf=[];
+try{const _d=JSON.parse(localStorage.getItem('wb.diag')||'[]');if(Array.isArray(_d))wbDiagBuf=_d}catch(e){}
+function wbDiagSave(){try{localStorage.setItem('wb.diag',JSON.stringify(wbDiagBuf))}catch(e){}}
+function wbDiag(level,msg,extra){
+  const e={t:new Date().toISOString(),lv:level,m:String(msg).slice(0,300)};
+  if(extra)e.x=String(extra).slice(0,300);
+  wbDiagBuf.push(e);
+  if(wbDiagBuf.length>WB_DIAG_MAX)wbDiagBuf=wbDiagBuf.slice(-WB_DIAG_MAX);
+  wbDiagSave();
+}
+function wbDiagText(){
+  const head='Yichi工作台 v'+WB_VER+' · '+new Date().toISOString()+'\nUA='+navigator.userAgent+'\n---';
+  return head+'\n'+wbDiagBuf.map(e=>e.t+' ['+e.lv+'] '+e.m+(e.x?(' | '+e.x):'')).join('\n');
+}
+window.addEventListener('error',ev=>{wbDiag('ERR',(ev.message||'error')+' @'+(ev.filename||'')+':'+(ev.lineno||''))});
+window.addEventListener('unhandledrejection',ev=>{wbDiag('REJ',String((ev.reason&&ev.reason.message)||ev.reason).slice(0,300))});
+
+function wbCheckVersion(force){
+  const proto=location.protocol;
+  if(proto!=='http:'&&proto!=='https:')return;          /* file:// / capacitor 本地壳跳过 */
+  const now=Date.now();
+  if(!force&&now-wbVerLastCheck<300000)return;           /* 5 分钟节流 */
+  wbVerLastCheck=now;
+  fetch('ver.json?v='+now,{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
+    if(j&&j.v&&wbVerCmp(j.v,WB_VER)>0)wbVerBanner(j.v);
+  }).catch(()=>{});
+}
 
 /* ================= 初始化 ================= */
 $$('.mod').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
@@ -4340,7 +4513,35 @@ switchTab(META[location.hash.slice(1)]?location.hash.slice(1):'tasks');
 if(curTab==='ai')setTimeout(()=>aiSuggest(false),400);
 document.addEventListener('wb:tabchange',e=>{if(e.detail&&e.detail.tab==='ai')setTimeout(()=>aiSuggest(false),300)});
 Sync.init();   /* 启动混合存储层：未配置 Supabase 且无 iCloud 插件时自动降级为纯本地模式 */
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if('serviceWorker' in navigator)window.addEventListener('load',()=>{
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    /* SW 换新控制器（且此前已被控制）= 有新版本资源就绪 → 提示重启 */
+    let hadCtrl=!!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(hadCtrl)wbVerBanner('');hadCtrl=true;
+    });
+    if(reg.installing||reg.waiting)reg.update().catch(()=>{});
+  }).catch(()=>{});
+});
+/* v1.30.0 版本巡检：加载后 + 回到前台 + 每 30 分钟 拉一次 ver.json */
+wbCheckVersion(true);
+window.addEventListener('pageshow',()=>wbCheckVersion(false));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wbCheckVersion(false)});
+setInterval(()=>wbCheckVersion(true),1800000);
+/* v1.30.0 诊断日志复制按钮 */
+(function(){
+  const b=document.getElementById('diagCopy');
+  if(!b)return;
+  b.onclick=async()=>{
+    const txt=wbDiagText();
+    try{
+      await navigator.clipboard.writeText(txt);
+      toast('诊断日志已复制 · '+wbDiagBuf.length+' 条');
+    }catch(e){
+      window.prompt('浏览器不允许直接复制，请手动全选复制以下诊断日志：',txt);
+    }
+  };
+})();
 </script>
 </body>
 </html>
