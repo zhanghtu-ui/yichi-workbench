@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=34">
+<link rel="manifest" href="manifest.json?v=35">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -406,6 +406,24 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 @keyframes stopPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,107,.5)}50%{box-shadow:0 0 0 6px rgba(255,107,107,0)}}
 .ai-empty{text-align:center;padding:28px 12px;color:var(--label2);font-size:13px;line-height:1.7}
 .ai-empty .kuromi{font-size:34px;margin-bottom:6px;opacity:.7}
+/* ---- v1.31.0 语音/周报/工作流/多会话 ---- */
+.ai-tools{display:flex;flex-wrap:wrap;gap:8px}
+.ai-tool-btn{padding:7px 12px;background:var(--card);border:1px solid var(--sep);border-radius:18px;font-size:12px;color:var(--label2);cursor:pointer;transition:.15s}
+.ai-tool-btn:active{transform:scale(.96)}
+.ai-tool-btn.on{border-color:var(--sky);color:var(--sky);background:rgba(255,111,181,.10)}
+.ai-mic-btn{flex:none;width:40px;height:40px;border-radius:50%;background:var(--card);border:1px solid var(--sep);color:var(--label);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px}
+.ai-mic-btn.rec{background:linear-gradient(135deg,#FF6B6B,#C73E3E);color:#fff;border-color:transparent;animation:stopPulse 1.2s ease-in-out infinite}
+.ai-sessions{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;-webkit-overflow-scrolling:touch}
+.ai-sessions::-webkit-scrollbar{display:none}
+.ai-sess-chip{flex:none;padding:6px 12px;background:var(--card);border:1px solid var(--sep);border-radius:16px;font-size:12px;color:var(--label2);cursor:pointer;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-sess-chip.on{border-color:var(--sky);color:#fff;background:linear-gradient(135deg,var(--sky),var(--sky-deep))}
+.ai-sess-add{flex:none;width:30px;height:30px;border-radius:50%;background:var(--card);border:1px dashed var(--sep);color:var(--sky);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;align-self:center}
+.ai-flow-manage{border-style:dashed;color:var(--label2)}
+.ai-week-review{margin-top:12px;padding:12px;border-radius:12px;background:rgba(157,107,255,.10);border:1px solid rgba(157,107,255,.28);font-size:13px;line-height:1.7;color:var(--label);white-space:pre-wrap}
+.ai-flow-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px dashed rgba(255,255,255,.10)}
+.ai-flow-row .grow{flex:1;min-width:0;font-size:14px;color:var(--label);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-flow-row .mini{flex:none;padding:5px 9px;border-radius:12px;background:var(--card);border:1px solid var(--sep);color:var(--label2);font-size:12px;cursor:pointer}
+.ai-flow-row .mini.del{color:#FF9A9A;border-color:rgba(255,107,107,.4)}
 </style>
 </head>
 <body>
@@ -600,6 +618,8 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     <div id="aiHero"></div>
     <div id="aiSug" style="margin-top:10px"></div>
     <div id="aiFlows" style="margin-top:12px"></div>
+    <div id="aiTools" style="margin-top:10px"></div>
+    <div id="aiSessions" style="margin-top:12px"></div>
     <div class="geo-region" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
       <span>对话</span>
       <span class="geo-stats" id="aiStats"></span>
@@ -708,6 +728,52 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <div class="sheet-body">
     <div id="reportCard"></div>
     <button class="btn" id="reportSave">💾 保存图片</button>
+  </div>
+</div>
+
+<!-- v1.31.0 周报卡弹窗 -->
+<div class="sheet" id="sheet-week">
+  <div class="handle"></div>
+  <div class="sheet-head">
+    <button class="cancel">关闭</button>
+    <span class="title">本周周报</span>
+    <span style="width:44px"></span>
+  </div>
+  <div class="sheet-body">
+    <div id="weekCard"></div>
+    <button class="btn" id="weekSave">💾 保存图片</button>
+  </div>
+</div>
+
+<!-- v1.31.0 工作流管理弹窗 -->
+<div class="sheet" id="sheet-aiflow">
+  <div class="handle"></div>
+  <div class="sheet-head">
+    <button class="cancel">关闭</button>
+    <span class="title">管理工作流</span>
+    <span style="width:44px"></span>
+  </div>
+  <div class="sheet-body">
+    <button class="btn" id="flowAdd">＋ 新建工作流</button>
+    <div id="flowList" style="margin-top:12px"></div>
+    <div class="acc-sub" style="margin-top:10px;text-align:center;font-size:12px;color:var(--label2)">长按工作流胶囊也可直接编辑 · 内置流可隐藏/改指令</div>
+  </div>
+</div>
+
+<!-- v1.31.0 工作流编辑弹窗 -->
+<div class="sheet" id="sheet-aiflow-edit">
+  <div class="handle"></div>
+  <div class="sheet-head">
+    <button class="cancel">关闭</button>
+    <span class="title" id="flowEditTitle">编辑工作流</span>
+    <span style="width:44px"></span>
+  </div>
+  <div class="sheet-body">
+    <div class="field"><label>图标（1 个 emoji）</label><input id="flowIc" type="text" maxlength="4" placeholder="💰"></div>
+    <div class="field"><label>名称（最多 12 字）</label><input id="flowLabel" type="text" maxlength="12" placeholder="分析本月支出"></div>
+    <div class="field"><label>指令 Prompt</label><textarea id="flowPrompt" rows="5" placeholder="点这条工作流时发给 AI 的指令…"></textarea></div>
+    <button class="btn" id="flowSave">💾 保存</button>
+    <button class="btn danger" id="flowReset" style="margin-top:8px">↺ 恢复默认</button>
   </div>
 </div>
 
@@ -3652,7 +3718,7 @@ $('#searchRes').addEventListener('click',e=>{
 $('#bkExport').onclick=()=>{
   const data={app:'Yichi工作台',ver:1,exported:new Date().toISOString(),
     tasks,ledger,trips,sports,work,pantry,geoMan,rec:recData,budget:+store.get('wb.budget',0)||0,
-    deposits,depAccs,depCats,depGoal:+store.get('wb.depGoal',0)||0,shop,wish:geoWish,events,aiChat};
+    deposits,depAccs,depCats,depGoal:+store.get('wb.depGoal',0)||0,shop,wish:geoWish,events,aiChat,aiSessions,aiFlows:aiFlowStore};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -3687,16 +3753,50 @@ $('#bkFile').addEventListener('change',async e=>{
   if(Array.isArray(d.shop)){shop=d.shop;saveShop()}
   if(Array.isArray(d.events)){events=d.events;saveEvents()}
   if(Array.isArray(d.wish)){const nw=d.wish.filter(w=>w&&typeof w.k==='string'&&w.k&&Array.isArray(w.c));if(nw.length){geoWish=nw;saveWish()}}
-  if(Array.isArray(d.aiChat)){aiChat=d.aiChat.filter(m=>m&&typeof m.role==='string'&&typeof m.content==='string');saveAiChat()}
+  if(Array.isArray(d.aiChat)){aiChat=d.aiChat.filter(m=>m&&typeof m.role==='string'&&typeof m.content==='string');aiChat.forEach(m=>{if(!m.sid)m.sid=AI_SID_DEFAULT});saveAiChat()}
+  if(Array.isArray(d.aiSessions)&&d.aiSessions.length){aiSessions=d.aiSessions.filter(s=>s&&typeof s.id==='string');if(!aiSessions.some(s=>s.id===AI_SID_DEFAULT))aiSessions.unshift({id:AI_SID_DEFAULT,title:'对话',ts:Date.now()});if(!aiSessions.some(s=>s.id===aiCurSid))aiCurSid=AI_SID_DEFAULT;saveAiSessions()}
+  if(d.aiFlows&&typeof d.aiFlows==='object'){aiFlowStore={over:(d.aiFlows.over&&typeof d.aiFlows.over==='object')?d.aiFlows.over:{},custom:Array.isArray(d.aiFlows.custom)?d.aiFlows.custom:[]};saveAiFlows()}
   renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderDeposit();renderShop();renderEvents();renderAI();renderSub();
   closeSheets();toast('导入完成 · 数据已恢复');
 });
 
 /* ================= AI 助手模块（v1.26.0） ================= */
-let aiChat=store.get('wb.aiChat',[]);          /* [{id,role,content,ts,flow,model,err,thinking}] */
+let aiChat=store.get('wb.aiChat',[]);          /* [{id,role,content,ts,flow,model,err,thinking,sid}] */
 const saveAiChat=()=>store.set('wb.aiChat',aiChat);
 if(!Array.isArray(aiChat))aiChat=[];
 aiChat=aiChat.filter(m=>m&&typeof m.role==='string'&&typeof m.content==='string');
+/* ---- v1.31.0 多会话：消息带 sid，老消息归入默认会话；云同步形状不变 ---- */
+const AI_SID_DEFAULT='s0';
+let aiSessions=store.get('wb.aiSessions',null);
+if(!Array.isArray(aiSessions)||!aiSessions.length)aiSessions=[{id:AI_SID_DEFAULT,title:'对话',ts:Date.now()}];
+aiSessions=aiSessions.filter(s=>s&&typeof s.id==='string');
+if(!aiSessions.some(s=>s.id===AI_SID_DEFAULT))aiSessions.unshift({id:AI_SID_DEFAULT,title:'对话',ts:Date.now()});
+let aiCurSid=store.get('wb.aiCurSid',AI_SID_DEFAULT);
+if(!aiSessions.some(s=>s.id===aiCurSid))aiCurSid=AI_SID_DEFAULT;
+aiChat.forEach(m=>{if(!m.sid)m.sid=AI_SID_DEFAULT});
+const saveAiSessions=()=>{store.set('wb.aiSessions',aiSessions);store.set('wb.aiCurSid',aiCurSid)};
+function aiCurMsgs(){return aiChat.filter(m=>(m.sid||AI_SID_DEFAULT)===aiCurSid)}
+function aiSessionTitle(sid){
+  const first=aiChat.find(m=>(m.sid||AI_SID_DEFAULT)===sid&&m.role==='user'&&m.content);
+  if(first){const t=first.content.trim().replace(/\s+/g,' ').slice(0,12);if(t)return t}
+  const s=aiSessions.find(x=>x.id===sid);return (s&&s.title)||'对话';
+}
+function aiNewSession(){
+  const id='s'+Date.now().toString(36);
+  aiSessions.push({id:id,title:'新对话',ts:Date.now()});
+  aiCurSid=id;saveAiSessions();saveAiChat();renderAI();
+}
+function aiSwitchSession(id){
+  if(!aiSessions.some(s=>s.id===id)||id===aiCurSid)return;
+  aiCurSid=id;saveAiSessions();renderAI();
+}
+function aiDeleteSession(id){
+  if(aiSessions.length<=1){toast('至少保留一个会话');return}
+  aiSessions=aiSessions.filter(s=>s.id!==id);
+  aiChat=aiChat.filter(m=>(m.sid||AI_SID_DEFAULT)!==id);
+  if(aiCurSid===id)aiCurSid=aiSessions[aiSessions.length-1].id;
+  saveAiSessions();saveAiChat();renderAI();toast('会话已删除');
+}
 let aiCfg=store.get('wb.aiCfg',null);          /* {provider,mode,key,proxyUrl,model,ctx} —— 仅本机，不云同步 */
 if(!aiCfg||typeof aiCfg!=='object')aiCfg={provider:'deepseek',mode:'direct',key:'',proxyUrl:'',model:'deepseek-chat',ctx:true,write:true};
 (()=>{const _pm={deepseek:['deepseek-chat','deepseek-reasoner'],openai:['gpt-4o-mini','gpt-4o','o4-mini']};
@@ -3712,7 +3812,7 @@ const AI_PROVIDERS={
 };
 function aiProv(p){return AI_PROVIDERS[p||aiCfg.provider]||AI_PROVIDERS.deepseek}
 const AI_MODELS=aiProv().models;
-const AI_FLOWS=[
+const AI_DEFAULT_FLOWS=[
   {id:'ledger',ic:'💰',label:'分析本月支出',build:()=>{
     const m=todayStr().slice(0,7);
     const rows=ledger.filter(r=>r.date.startsWith(m)&&r.type==='expense');
@@ -3753,6 +3853,220 @@ const AI_FLOWS=[
   },prompt:'用不超过 60 字给我今天的表现打个分（0-10）并给一句明日建议，语气毒舌但善意。'},
 ];
 
+/* ================= v1.31.0 自定义工作流 ================= */
+let aiFlowStore=store.get('wb.aiFlows',null)||{over:{},custom:[]};
+if(!aiFlowStore||typeof aiFlowStore!=='object')aiFlowStore={over:{},custom:[]};
+if(!aiFlowStore.over||typeof aiFlowStore.over!=='object')aiFlowStore.over={};
+if(!Array.isArray(aiFlowStore.custom))aiFlowStore.custom=[];
+const saveAiFlows=()=>store.set('wb.aiFlows',aiFlowStore);
+function aiAllFlows(all){
+  const built=AI_DEFAULT_FLOWS.map(f=>{
+    const o=aiFlowStore.over[f.id]||{};
+    return {id:f.id,ic:o.ic||f.ic,label:o.label||f.label,prompt:o.prompt||f.prompt,build:f.build,builtin:true,hidden:!!o.hidden};
+  }).filter(f=>all||!f.hidden);
+  const custom=aiFlowStore.custom.map(f=>({id:f.id,ic:f.ic||'✨',label:f.label||'自定义',prompt:f.prompt||'',build:()=>'',builtin:false,hidden:false}));
+  return built.concat(custom);
+}
+function aiFindFlow(id){return aiAllFlows(true).find(f=>f.id===id)}
+let aiEditingFlow=null,aiLpFired=false;
+function aiOpenFlowMgr(){
+  const L=$('#flowList');
+  if(L)L.innerHTML=aiAllFlows(true).map(f=>{
+    const hidden=f.builtin&&!!f.hidden;
+    return `<div class="ai-flow-row"><span class="grow">${f.ic} ${esc(f.label)}${f.builtin?'':' <span style="opacity:.5;font-size:11px">自定义</span>'}</span>`
+      +`<span class="mini" data-fedit="${f.id}">编辑</span>`
+      +(f.builtin?`<span class="mini" data-fhide="${f.id}">${hidden?'显示':'隐藏'}</span>`:`<span class="mini del" data-fdel="${f.id}">删除</span>`)
+      +`</div>`;
+  }).join('')||'<div style="color:var(--label2);font-size:13px;padding:12px 0">暂无工作流</div>';
+  openSheet('sheet-aiflow');
+}
+function aiEditFlow(id){
+  const f=(id==='__new__')?{ic:'✨',label:'',prompt:''}:aiFindFlow(id);
+  if(!f)return;
+  aiEditingFlow=id;
+  $('#flowEditTitle').textContent=(id==='__new__')?'新建工作流':'编辑工作流';
+  $('#flowIc').value=f.ic||'✨';
+  $('#flowLabel').value=f.label||'';
+  $('#flowPrompt').value=f.prompt||'';
+  const rs=$('#flowReset');if(rs)rs.style.display=(f.builtin&&id!=='__new__')?'':'none';
+  openSheet('sheet-aiflow-edit');
+}
+function aiNewFlow(){aiEditFlow('__new__')}
+function aiFlowSave(){
+  const ic=(($('#flowIc').value||'').trim()||'✨').slice(0,4);
+  const label=($('#flowLabel').value||'').trim().slice(0,12);
+  const prompt=($('#flowPrompt').value||'').trim();
+  if(!label){toast('请填写名称');return}
+  if(!prompt){toast('请填写指令 Prompt');return}
+  const id=aiEditingFlow;
+  if(id==='__new__'){
+    aiFlowStore.custom.push({id:'c'+Date.now().toString(36),ic:ic,label:label,prompt:prompt});
+  }else{
+    const f=aiFindFlow(id);
+    if(f&&f.builtin){aiFlowStore.over[id]=Object.assign({},aiFlowStore.over[id]||{},{ic:ic,label:label,prompt:prompt})}
+    else{const c=aiFlowStore.custom.find(x=>x.id===id);if(c){c.ic=ic;c.label=label;c.prompt=prompt}}
+  }
+  saveAiFlows();closeSheets();renderAI();toast('工作流已保存');
+}
+function aiFlowReset(){
+  const id=aiEditingFlow;if(!id||id==='__new__')return;
+  delete aiFlowStore.over[id];saveAiFlows();closeSheets();renderAI();toast('已恢复默认');
+}
+function aiFlowToggleHide(id){
+  const o=aiFlowStore.over[id]||{};o.hidden=!o.hidden;aiFlowStore.over[id]=o;
+  saveAiFlows();aiOpenFlowMgr();renderAI();
+}
+function aiFlowDelete(id){
+  aiFlowStore.custom=aiFlowStore.custom.filter(x=>x.id!==id);
+  saveAiFlows();aiOpenFlowMgr();renderAI();toast('已删除');
+}
+/* 长按工作流胶囊 → 编辑（不触发发送） */
+(function(){
+  let lpTimer=null;
+  const clear=()=>{if(lpTimer){clearTimeout(lpTimer);lpTimer=null}};
+  document.addEventListener('pointerdown',e=>{
+    const chip=e.target.closest('#aiFlows .ai-flow-chip[data-flow]');
+    if(!chip)return;
+    const id=chip.dataset.flow;clear();aiLpFired=false;
+    lpTimer=setTimeout(()=>{lpTimer=null;aiLpFired=true;try{navigator.vibrate&&navigator.vibrate(15)}catch(_){}aiEditFlow(id)},560);
+  });
+  document.addEventListener('pointerup',clear);
+  document.addEventListener('pointercancel',clear);
+  document.addEventListener('scroll',clear,true);
+})();
+
+/* ================= v1.31.0 语音输入 / 语音回复 ================= */
+let aiTTS=!!store.get('wb.aiTTS',false);
+function aiSaveTTS(){store.set('wb.aiTTS',aiTTS)}
+function aiTTSSupported(){return typeof window!=='undefined'&&('speechSynthesis'in window)}
+function aiSpeak(text){
+  if(!aiTTS||!aiTTSSupported())return;
+  try{
+    const t=(text||'').replace(/[*#>`_]/g,'').trim();
+    if(!t)return;
+    window.speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(t.slice(0,600));
+    u.lang='zh-CN';u.rate=1.02;u.pitch=1.05;
+    window.speechSynthesis.speak(u);
+  }catch(e){wbDiag('AI','TTS 失败：'+(e&&e.message||e))}
+}
+function aiStopSpeak(){try{if(aiTTSSupported())window.speechSynthesis.cancel()}catch(e){}}
+const WB_SR=(typeof window!=='undefined')?(window.SpeechRecognition||window.webkitSpeechRecognition||null):null;
+function aiMicSupported(){return !!WB_SR}
+let aiRec=null,aiRecOn=false;
+function aiMicToggle(){
+  if(!aiMicSupported()){toast('当前浏览器不支持语音输入');return}
+  if(aiRecOn){try{aiRec.stop()}catch(e){}return}
+  try{
+    aiRec=new WB_SR();
+    aiRec.lang='zh-CN';aiRec.continuous=false;aiRec.interimResults=true;aiRec.maxAlternatives=1;
+    let base='';const box=$('#aiInputBox');if(box&&box.value)base=box.value+' ';
+    aiRec.onstart=()=>{aiRecOn=true;const b=$('#aiMicBtn');if(b)b.classList.add('rec');toast('正在聆听…')};
+    aiRec.onresult=(ev)=>{
+      let txt='';for(let i=ev.resultIndex;i<ev.results.length;i++){txt+=ev.results[i][0].transcript}
+      const nb=$('#aiInputBox');if(nb){nb.value=(base+txt).trim();aiAutoGrow(nb)}
+    };
+    aiRec.onerror=(ev)=>{wbDiag('AI','语音识别错误：'+((ev&&ev.error)||''));toast('语音识别失败：'+((ev&&ev.error)||''))};
+    aiRec.onend=()=>{aiRecOn=false;const b=$('#aiMicBtn');if(b)b.classList.remove('rec')};
+    aiRec.start();
+  }catch(e){aiRecOn=false;wbDiag('AI','语音启动异常：'+(e&&e.message||e));toast('无法启动语音输入')}
+}
+
+/* ================= v1.31.0 周报卡 ================= */
+function aiWeekRange(){
+  const now=new Date();const dow=(now.getDay()+6)%7;   /* 周一为一周起点 */
+  const mon=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow);
+  const days=[];for(let i=0;i<7;i++){const d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i);days.push(dateKey(d))}
+  return {start:days[0],end:days[6],days:days,label:days[0].slice(5)+'~'+days[6].slice(5)};
+}
+function aiWeekStats(){
+  const r=aiWeekRange();const inW=d=>r.days.indexOf(d)>-1;
+  const led=ledger.filter(x=>inW(x.date));
+  const inc=led.filter(x=>x.type==='income').reduce((a,b)=>a+ +b.amount,0);
+  const out=led.filter(x=>x.type==='expense').reduce((a,b)=>a+ +b.amount,0);
+  const byCat={};led.filter(x=>x.type==='expense').forEach(x=>{byCat[x.cat]=(byCat[x.cat]||0)+ +x.amount});
+  const top=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const dep=deposits.filter(x=>inW(x.date)).reduce((a,b)=>a+ +b.amt,0);
+  const sp=sports.filter(x=>inW(x.date));
+  const spMin=sp.reduce((a,b)=>a+(+b.dur||0),0);
+  const doneTasks=tasks.filter(t=>t.done&&t.doneAt&&inW(dateKey(new Date(t.doneAt)))).length;
+  const tr=trips.filter(t=>inW(t.start)||inW(t.end)||(t.start&&t.end&&t.start<=r.start&&t.end>=r.end));
+  return {range:r,inc:inc,out:out,dep:dep,top:top,spN:sp.length,spMin:spMin,doneTasks:doneTasks,trips:tr,ledN:led.length};
+}
+let lastWeek=null;
+function aiWeekCardHtml(){
+  const W=lastWeek;if(!W)return '';
+  return '<div style="border-radius:18px;padding:16px 14px;background:linear-gradient(160deg,#241a35,#1a1426);border:1px solid rgba(157,107,255,.35)">'
+    +'<div style="font-size:15px;font-weight:700;color:#9D6BFF">Yichiの工作台 · 本周周报</div>'
+    +'<div style="font-size:12px;color:rgba(245,238,248,.55);margin:2px 0 10px">'+esc(W.label)+'</div>'
+    +W.rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed rgba(255,255,255,.10);font-size:13px"><span style="color:rgba(245,238,248,.75);flex:none">'+r[0]+' '+r[1]+'</span><b style="text-align:right;color:#F5EEF8">'+esc(r[2])+'</b></div>').join('')
+    +'<div class="ai-week-review">'+(W.loading?'✍️ ':'')+esc(W.review)+'</div>'
+    +'<div style="font-size:11px;color:rgba(245,238,248,.45);margin-top:10px">生成于 '+todayStr()+' · 继续加油 🎀</div></div>';
+}
+async function aiWeekReport(){
+  const S=aiWeekStats();
+  lastWeek={label:S.range.label,loading:true,review:'正在生成周评…',rows:[
+    ['💶','本周收入',fmtMoney(S.inc)],
+    ['🛍️','本周支出',fmtMoney(S.out)],
+    ['🐷','本周存入','+'+fmtMoney(S.dep)],
+    ['🏆','花得最多',S.top.length?S.top.map(kv=>kv[0]+' '+fmtMoney(kv[1])).join(' · '):'—'],
+    ['🏃','运动',S.spN?(S.spN+' 次 · '+S.spMin+' 分钟'):'—'],
+    ['✅','任务完成',S.doneTasks+' 项'],
+    ['✈️','旅行',S.trips.length?S.trips.map(t=>t.dest).join('、'):'没有出行']
+  ]};
+  const wc=$('#weekCard');if(wc)wc.innerHTML=aiWeekCardHtml();
+  openSheet('sheet-week');
+  const okCfg=aiCfg.mode==='direct'?!!aiCfg.key:!!aiCfg.proxyUrl;
+  if(!okCfg){lastWeek.review='（演示模式：配置 API 后这里会生成一段 AI 周评）';lastWeek.loading=false;const w2=$('#weekCard');if(w2)w2.innerHTML=aiWeekCardHtml();return}
+  try{
+    const dataLines=[
+      '本周（'+S.range.start+' ~ '+S.range.end+'）：',
+      '记账 '+S.ledN+' 笔，收入 '+fmtMoney(S.inc)+'，支出 '+fmtMoney(S.out)+'，存入 '+fmtMoney(S.dep),
+      '支出 Top 分类：'+(S.top.map(kv=>kv[0]+' '+fmtMoney(kv[1])).join('、')||'无'),
+      '运动 '+S.spN+' 次共 '+S.spMin+' 分钟，任务完成 '+S.doneTasks+' 项',
+      '旅行：'+(S.trips.length?S.trips.map(t=>t.dest+'('+t.start+')').join('、'):'无')
+    ].join('\n');
+    const sys='你是 Yichi 的私人助理。基于下方本周数据，写一段 180-220 字的中文周评：先肯定做得好的地方，再温和指出可改进项，最后一句给下周的小目标。语气像贴心闺蜜，自然段，不要列表，不要出现“根据数据”。';
+    const r=await aiCallLLM([{role:'system',content:sys+'\n\n'+dataLines},{role:'user',content:'帮我写这周的周报'}],null);
+    aiAddUsage(r.usage);
+    lastWeek.review=(r.content||'').trim()||'（AI 没有返回内容）';
+  }catch(e){
+    wbDiag('AI','周报生成失败：'+(e&&e.message||e));
+    lastWeek.review='⚠️ 周评生成失败：'+(e&&e.message||e);
+  }finally{
+    lastWeek.loading=false;const w3=$('#weekCard');if(w3)w3.innerHTML=aiWeekCardHtml();
+  }
+}
+(function(){
+  const btn=$('#weekSave');
+  if(btn)btn.onclick=()=>{
+    if(!lastWeek)return;
+    const W=lastWeek,Wd=750,review=String(W.review||'');
+    const tmp=document.createElement('canvas').getContext('2d');tmp.font='24px sans-serif';
+    const maxW=Wd-80,lines=[];
+    review.split('\n').forEach(p=>{let cur='';for(const ch of p){const t=cur+ch;if(tmp.measureText(t).width>maxW&&cur){lines.push(cur);cur=ch}else cur=t}lines.push(cur)});
+    const H=170+W.rows.length*60+56+lines.length*36+70;
+    const cv=document.createElement('canvas');cv.width=Wd;cv.height=H;const x=cv.getContext('2d');
+    x.fillStyle='#151020';x.fillRect(0,0,Wd,H);
+    x.fillStyle='#9D6BFF';x.font='bold 34px sans-serif';x.fillText('Yichiの工作台 · 本周周报',40,72);
+    x.fillStyle='rgba(245,238,248,.55)';x.font='24px sans-serif';x.fillText(W.label,40,110);
+    let yy=150;
+    W.rows.forEach(r=>{
+      x.strokeStyle='rgba(255,255,255,.12)';x.beginPath();x.moveTo(40,yy);x.lineTo(Wd-40,yy);x.stroke();
+      x.fillStyle='rgba(245,238,248,.75)';x.font='26px sans-serif';x.fillText(r[0]+' '+r[1],40,yy+40);
+      x.fillStyle='#F5EEF8';x.font='bold 26px sans-serif';
+      const val=String(r[2]);let tw=x.measureText(val).width;if(tw>Wd-340){x.font='bold 20px sans-serif';tw=x.measureText(val).width}
+      x.fillText(val,Wd-40-tw,yy+40);yy+=60;
+    });
+    yy+=30;x.fillStyle='rgba(157,107,255,.9)';x.font='bold 26px sans-serif';x.fillText('📝 AI 周评',40,yy);
+    x.fillStyle='rgba(245,238,248,.85)';x.font='24px sans-serif';
+    lines.forEach(ln=>{yy+=34;x.fillText(ln,40,yy)});
+    x.fillStyle='rgba(245,238,248,.45)';x.font='20px sans-serif';x.fillText('生成于 '+todayStr()+' · 继续加油 🎀',40,H-26);
+    const a=document.createElement('a');a.download='Yichi周报-'+W.label.replace('~','_')+'.png';a.href=cv.toDataURL('image/png');
+    document.body.appendChild(a);a.click();a.remove();toast('周报图已保存');
+  };
+})();
+
 /* ---- v1.30.0 token / 费用看板：累计用量独立于对话存储，清空对话不清零 ---- */
 let aiUsage=store.get('wb.aiUsage',null)||{p:0,c:0,t:0};
 function aiSaveUsage(){store.set('wb.aiUsage',aiUsage)}
@@ -3792,7 +4106,8 @@ function aiHeroHtml(){
   </div>`;
 }
 function aiFlowsHtml(){
-  return `<div class="ai-flows">`+AI_FLOWS.map(f=>`<span class="ai-flow-chip" data-flow="${f.id}"><span class="ic">${f.ic}</span>${f.label}</span>`).join('')+`</div>`;
+  const chips=aiAllFlows().map(f=>`<span class="ai-flow-chip" data-flow="${f.id}"><span class="ic">${f.ic}</span>${esc(f.label)}</span>`).join('');
+  return `<div class="ai-flows">${chips}<span class="ai-flow-chip ai-flow-manage" data-act="ai-flow-manage" title="管理工作流">⚙️ 管理</span></div>`;
 }
 function aiMsgHtml(m){
   const t=new Date(m.ts||Date.now());
@@ -3803,12 +4118,25 @@ function aiMsgHtml(m){
   const toolsTag=(m.tools&&m.tools.length)?`<span style="display:block;font-size:11px;opacity:.85;margin-bottom:4px">🛠 已写回：${esc(m.tools.join('；'))}</span>`:'';
   return `<div class="${cls}" id="aim-${m.id}">${flowTag}${toolsTag}<span class="ai-body" id="aib-${m.id}">${body}</span><span class="ts">${hh}:${mm}${m.model?' · '+esc(m.model):''}${m.stopped?' · 已停止':''}</span></div>`;
 }
+function aiToolsHtml(){
+  return `<div class="ai-tools">`
+    +`<span class="ai-tool-btn${aiTTS?' on':''}" data-act="ai-tts" title="AI 回复后中文朗读">🔊 语音回复：${aiTTS?'开':'关'}</span>`
+    +`<span class="ai-tool-btn" data-act="ai-week" title="汇总本周数据 + AI 周评，可导出图片">🗓 周报卡</span>`
+    +`</div>`;
+}
+function aiSessionsHtml(){
+  if(aiSessions.length<=1)return '';
+  return `<div class="ai-sessions">`+aiSessions.map(s=>`<span class="ai-sess-chip${s.id===aiCurSid?' on':''}" data-sess="${s.id}">${esc(aiSessionTitle(s.id))}</span>`).join('')+`<span class="ai-sess-add" data-act="ai-sess-new" aria-label="新会话">＋</span></div>`;
+}
 function aiChatHtml(){
-  if(!aiChat.length)return `<div class="ai-empty"><div class="kuromi">🪄</div>还没有对话，试试上面的快捷工作流<br>或直接输入你的问题</div>`;
-  return `<div class="ai-msgs">${aiChat.slice(-40).map(aiMsgHtml).join('')}</div>`;
+  const msgs=aiCurMsgs();
+  if(!msgs.length)return `<div class="ai-empty"><div class="kuromi">🪄</div>还没有对话，试试上面的快捷工作流<br>或直接输入你的问题</div>`;
+  return `<div class="ai-msgs">${msgs.slice(-40).map(aiMsgHtml).join('')}</div>`;
 }
 function aiInputHtml(){
+  const mic=aiMicSupported()?`<button class="ai-mic-btn" id="aiMicBtn" aria-label="语音输入">🎙</button>`:'';
   return `<div class="ai-input-bar">
+    ${mic}
     <textarea id="aiInputBox" placeholder="问我任何事…（Enter 发送）" rows="1"></textarea>
     ${aiBusy?'<button class="ai-send-btn stop" id="aiStopBtn" aria-label="停止生成">⏹</button>':'<button class="ai-send-btn" id="aiSendBtn" aria-label="发送">➤</button>'}
   </div>`;
@@ -3818,6 +4146,8 @@ function renderAI(){
   const hero=$('#aiHero');if(hero)hero.innerHTML=aiHeroHtml();
   aiSugRender();
   const flows=$('#aiFlows');if(flows)flows.innerHTML=aiFlowsHtml();
+  const tools=$('#aiTools');if(tools)tools.innerHTML=aiToolsHtml();
+  const sess=$('#aiSessions');if(sess)sess.innerHTML=aiSessionsHtml();
   const chat=$('#aiChat');if(chat)chat.innerHTML=aiChatHtml();
   const inp=$('#aiInput');
   if(inp){
@@ -3834,7 +4164,8 @@ function renderAI(){
     const sb=$('#aiSendBtn');if(sb)sb.disabled=aiBusy;
   }
   const st=$('#aiStats');
-  if(st)st.textContent=aiChat.length?`${aiChat.length} 条`:'';
+  const _cn=aiCurMsgs().length;
+  if(st)st.textContent=_cn?`${_cn} 条`:'';
 }
 
 function aiBuildContext(userMsg){
@@ -4261,10 +4592,13 @@ async function aiSend(text,flow){
   text=(text||'').trim();
   if(!text||aiBusy)return;
   aiBusy=true;renderAI();
-  const userMsg={id:uid(),role:'user',content:text,ts:Date.now(),flow:flow?flow.label:''};
-  aiChat.push(userMsg);saveAiChat();renderAI();
+  const userMsg={id:uid(),role:'user',content:text,ts:Date.now(),flow:flow?flow.label:'',sid:aiCurSid};
+  aiChat.push(userMsg);saveAiChat();
+  const _sess=aiSessions.find(s=>s.id===aiCurSid);
+  if(_sess&&(!_sess.title||_sess.title==='新对话'||_sess.title==='对话')){_sess.title=text.trim().replace(/\s+/g,' ').slice(0,12)||'对话';saveAiSessions()}
+  renderAI();
   const botId=uid();
-  aiChat.push({id:botId,role:'bot',content:'',ts:Date.now(),thinking:true,flow:flow?flow.label:''});
+  aiChat.push({id:botId,role:'bot',content:'',ts:Date.now(),thinking:true,flow:flow?flow.label:'',sid:aiCurSid});
   saveAiChat();renderAI();
   const okCfg=aiCfg.mode==='direct'?!!aiCfg.key:!!aiCfg.proxyUrl;
   try{
@@ -4273,6 +4607,7 @@ async function aiSend(text,flow){
       const reply=`【演示模式】我收到你说：「${text}」\n\n要让我真正干活，请点上方 ⚙️ 接入设置，选择模型服务商（DeepSeek / OpenAI）并填入 API Key（直连模式），或部署 Edge Function 后填代理 URL。\n\n这条回复没有消耗任何 token。`;
       const idx=aiChat.findIndex(m=>m.id===botId);
       if(idx>-1){aiChat[idx]={...aiChat[idx],content:reply,thinking:false,model:'demo'};saveAiChat()}
+      aiSpeak(reply);
     }else{
       const sys=[
         '你是 Yichi 的私人 AI 助手，性格贴心、直接、带点幽默，用中文简体回复。',
@@ -4286,7 +4621,7 @@ async function aiSend(text,flow){
         let fdata='';try{fdata=flow.build()}catch(e){fdata='（数据构建失败：'+(e&&e.message||e)+'）'}
         msgs.push({role:'system',content:`【工作流】${flow.label}\n【数据】\n${fdata}\n【指令】${flow.prompt}`});
       }
-      aiChat.filter(m=>m.id!==botId&&!m.thinking&&!m.err&&m.model!=='demo').slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
+      aiCurMsgs().filter(m=>m.id!==botId&&!m.thinking&&!m.err&&m.model!=='demo').slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
       let res=await aiCallLLM(msgs,aiToolsEnabled(aiCfg.model||aiProv().defModel)?AI_TOOLS:null,{onDelta:t=>aiLiveUpdate(botId,t)});
       aiAddUsage(res.usage);
       const doneTools=[];
@@ -4305,6 +4640,7 @@ async function aiSend(text,flow){
       }
       const idx=aiChat.findIndex(m=>m.id===botId);
       if(idx>-1){aiChat[idx]={...aiChat[idx],content:res.content||'',thinking:false,model:res.model||aiCfg.model,tools:doneTools.length?doneTools:undefined,stopped:res.stopped||undefined,usage:res.usage||undefined};saveAiChat()}
+      if(!res.stopped)aiSpeak(res.content||'');
     }
   }catch(e){
     wbDiag('AI','aiSend 异常：'+(e&&e.message||e));
@@ -4384,15 +4720,39 @@ document.addEventListener('click',e=>{
     return;
   }
   if(e.target.closest('#aiClearChat')){
-    if(!aiChat.length){toast('对话已为空');return}
-    if(!confirm(`清空 ${aiChat.length} 条对话？此操作不可撤销。`))return;
-    aiChat.length=0;saveAiChat();closeSheets();renderAI();toast('对话已清空');return;
+    const cur=aiCurMsgs();
+    if(!cur.length){toast('当前会话已为空');return}
+    if(!confirm(`清空当前会话 ${cur.length} 条对话？此操作不可撤销。`))return;
+    aiChat=aiChat.filter(m=>(m.sid||AI_SID_DEFAULT)!==aiCurSid);saveAiChat();
+    const s=aiSessions.find(x=>x.id===aiCurSid);if(s)s.title='对话';saveAiSessions();
+    closeSheets();renderAI();toast('当前会话已清空');return;
   }
   if(e.target.closest('#aiHero [data-act="ai-cfg"]')){aiOpenCfg();return}
+  /* v1.31.0 会话切换 */
+  const sessChip=e.target.closest('#aiSessions .ai-sess-chip');
+  if(sessChip){aiSwitchSession(sessChip.dataset.sess);return}
+  if(e.target.closest('#aiSessions [data-act="ai-sess-new"]')){aiNewSession();return}
+  /* v1.31.0 工具条：语音回复开关 / 周报卡 */
+  if(e.target.closest('[data-act="ai-tts"]')){
+    if(!aiTTSSupported()){toast('当前浏览器不支持语音朗读');return}
+    aiTTS=!aiTTS;aiSaveTTS();if(!aiTTS)aiStopSpeak();renderAI();toast(aiTTS?'语音回复已开启':'语音回复已关闭');return;
+  }
+  if(e.target.closest('[data-act="ai-week"]')){aiWeekReport();return}
+  /* v1.31.0 语音输入 */
+  if(e.target.closest('#aiMicBtn')){aiMicToggle();return}
+  /* v1.31.0 工作流管理 */
+  if(e.target.closest('#aiFlows [data-act="ai-flow-manage"]')){aiOpenFlowMgr();return}
+  if(e.target.closest('#flowAdd')){aiNewFlow();return}
+  const _fe=e.target.closest('[data-fedit]');if(_fe){aiEditFlow(_fe.dataset.fedit);return}
+  const _fh=e.target.closest('[data-fhide]');if(_fh){aiFlowToggleHide(_fh.dataset.fhide);return}
+  const _fd=e.target.closest('[data-fdel]');if(_fd){if(confirm('删除这个自定义工作流？'))aiFlowDelete(_fd.dataset.fdel);return}
+  if(e.target.closest('#flowSave')){aiFlowSave();return}
+  if(e.target.closest('#flowReset')){aiFlowReset();return}
   const chip=e.target.closest('#aiFlows .ai-flow-chip');
   if(chip){
+    if(aiLpFired){aiLpFired=false;return}
     const id=chip.dataset.flow;
-    const f=AI_FLOWS.find(x=>x.id===id);
+    const f=aiFindFlow(id);
     if(f)aiSend(f.prompt,f);
     return;
   }
@@ -4436,7 +4796,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.30.0';
+const WB_VER='1.31.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ---- v1.30.0 新版本提示横幅：线上 ver.json 比本地新 / SW 换控制器 时提示重启 ---- */
