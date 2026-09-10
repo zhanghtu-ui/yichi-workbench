@@ -1,5 +1,5 @@
 /* Yichiの工作台 · 离线壳 Service Worker（v1.18.0 引入） */
-const CACHE = 'ycwb-v21';
+const CACHE = 'ycwb-v22';
 const CORE = ['./', './index.html', './manifest.json', './k3-192.png', './k3-512.png'];
 
 self.addEventListener('install', e => {
