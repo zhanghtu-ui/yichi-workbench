@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=36">
+<link rel="manifest" href="manifest.json?v=37">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -382,6 +382,19 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
 .fx-row{display:flex;align-items:center;gap:8px;margin-top:10px}
 .fx-inp{flex:1;min-width:0;background:var(--card);border:none;border-radius:12px;padding:10px 12px;color:var(--label);font-size:16px;text-align:right}
 .fx-cur{flex:none;font-size:12px;font-weight:700;color:var(--label2);width:52px}
+/* v1.33.0 一句话速记 / 财务提醒 / 记忆 / 月度复盘 */
+.ql-row{display:flex;gap:8px;align-items:center;margin-top:6px}
+.ql-inp{flex:1;min-width:0;background:var(--bg);border:1px solid var(--sep);border-radius:12px;padding:10px 12px;color:var(--label);font-size:14px}
+.ql-prev{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.ql-item{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--label);background:var(--bg);border-radius:10px;padding:8px 10px}
+.ql-item b{color:#9BE0B5;flex:none}
+.ai-alert{border-radius:16px;padding:12px 14px;background:linear-gradient(160deg,#2a1c2e,#1a1426);border:1px solid rgba(255,111,181,.30)}
+.ai-alert-h{font-size:13px;font-weight:700;color:#FF6FB5;margin-bottom:6px}
+.ai-alert-row{font-size:12.5px;color:rgba(245,238,248,.82);padding:3px 0;display:flex;gap:6px}
+.ai-alert-row.warn{color:#FFB3AC}
+.ai-month-review{margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.12);font-size:13px;line-height:1.7;color:rgba(245,238,248,.85);white-space:pre-wrap}
+.mem-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--sep)}
+.mem-tx{font-size:13.5px;color:var(--label);flex:1;min-width:0}
 .budget-track{flex:1;max-width:120px;height:6px;border-radius:3px;background:var(--ink);overflow:hidden}
 .budget-track i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--sky),var(--sky-deep))}
 .budget-line.over .budget-track i{background:linear-gradient(90deg,#FF7A6E,var(--red))}
@@ -508,6 +521,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <div class="sum"><span class="sum-l" id="sumBalL">本月结余</span><span class="sum-v bal" id="sumBal">€0.00</span></div>
     </div>
     <div class="budget-line" id="budgetLine"></div>
+    <div class="card pad" id="quickLed" style="margin-bottom:12px"></div>
     <div class="card pad" id="billCard" style="display:none;margin-bottom:12px"></div>
     <div class="card pad">
       <div class="segment" id="boardSeg" style="margin-bottom:14px">
@@ -650,6 +664,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <section class="page" id="page-ai">
     <div id="aiHero"></div>
     <div id="aiSug" style="margin-top:10px"></div>
+    <div id="aiAlert" style="margin-top:10px"></div>
     <div id="aiFlows" style="margin-top:12px"></div>
     <div id="aiTools" style="margin-top:10px"></div>
     <div id="aiSessions" style="margin-top:12px"></div>
@@ -801,6 +816,26 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
   <div class="sheet-body">
     <div id="weekCard"></div>
     <button class="btn" id="weekSave">💾 保存图片</button>
+  </div>
+</div>
+
+<!-- v1.33.0 长期记忆弹窗 -->
+<div class="sheet" id="sheet-mem">
+  <div class="handle"></div>
+  <div class="sheet-head">
+    <button class="cancel">关闭</button>
+    <span class="title">AI 长期记忆</span>
+    <span style="width:44px"></span>
+  </div>
+  <div class="sheet-body">
+    <div class="input-bar" style="margin-bottom:10px">
+      <input id="memInput" type="text" placeholder="让我记住…（如：我不吃香菜）" autocomplete="off" maxlength="120">
+      <button class="add-round" id="memAdd" aria-label="记住">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+    <div class="geo-stats" id="memCount" style="margin:2px 2px 8px"></div>
+    <div id="memList"></div>
   </div>
 </div>
 
@@ -1443,7 +1478,7 @@ function renderLedger(){
   $('#sumIn').textContent=fmtMoney(inc);
   $('#sumBal').textContent=fmtMoney(inc-out);
   renderBudget(out);
-  renderBills();
+  renderBills();renderQuickLed();
   buildLedCatFilter();
   renderBoards();
   renderCatBudgets();
@@ -2907,7 +2942,7 @@ function enableSwipeDel(sel){
      表结构见 supabase_schema.sql；留空可退回本地 / iCloud 模式。 */
 const WB_CONFIG=Object.assign({SUPABASE_URL:'https://flupnwmpsshkrbfrjofl.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_1P-PNnwKyulHVfFl_XXc9g_5CrIk-A-'},window.__WB_CFG||{});
 
-const SYNC_KEYS={'wb.tasks':'tasks','wb.ledger':'ledger','wb.trips':'travel','wb.sports':'sport','wb.work':'work','wb.pantry':'menu','wb.deposits':'deposit','wb.depAccs':'deposit','wb.depCats':'depcats','wb.shop':'shop','wb.wish':'wish','wb.events':'events','wb.diary':'diary','wb.aiChat':'aichat'};
+const SYNC_KEYS={'wb.tasks':'tasks','wb.ledger':'ledger','wb.trips':'travel','wb.sports':'sport','wb.work':'work','wb.pantry':'menu','wb.deposits':'deposit','wb.depAccs':'deposit','wb.depCats':'depcats','wb.shop':'shop','wb.wish':'wish','wb.events':'events','wb.diary':'diary','wb.aiChat':'aichat','wb.aiMemory':'aimem'};
 /* 内存数组是 UI 的唯一数据源；同步层直接读写这些引用，避免与 localStorage 解析副本脱节 */
 const ARR=()=>({'wb.tasks':tasks,'wb.ledger':ledger,'wb.trips':trips,'wb.sports':sports,'wb.work':work,'wb.pantry':pantry,'wb.deposits':deposits,'wb.depAccs':depAccs,'wb.depCats':depCats,'wb.shop':shop,'wb.wish':geoWish,'wb.events':events,'wb.aiChat':aiChat});
 
@@ -3598,6 +3633,185 @@ $('#shopList').addEventListener('click',e=>{
   }
   s.done=!s.done;s._ut=Date.now();saveShop();renderShop();
 });
+/* ================= v1.33.0 一句话速记（离线批量解析） ================= */
+const QL_CATMAP=[
+  [/饭|餐|吃|外卖|咖啡|奶茶|早餐|午餐|晚餐|宵夜|小吃|喝|面|粉|火锅|烧烤/,'餐饮'],
+  [/打车|地铁|公交|油|停车|高铁|火车|机票|飞|加油|taxi|uber|滴滴/,'交通'],
+  [/超市|买菜|菜场|生鲜|食材|日用/,'超市'],
+  [/房租|水电|电费|水费|网费|燃气|物业|居住/,'居住'],
+  [/药|医|看病|挂号|体检/,'医疗'],
+  [/电影|玩|娱乐|游戏|ktv|门票|展|酒吧|旅行/,'娱乐'],
+  [/买|购|衣|裤|鞋|包|化妆|护肤|数码/,'购物']
+];
+function qlCat(note){
+  const s=String(note||'');
+  for(let i=0;i<QL_CATMAP.length;i++){if(QL_CATMAP[i][0].test(s))return QL_CATMAP[i][1]}
+  return '其他';
+}
+function parseQuickLedger(text){
+  text=String(text||'').trim();if(!text)return[];
+  const now=dOnly(todayStr());
+  let gOff=0;
+  if(/前天/.test(text))gOff=-2;else if(/昨天|昨日/.test(text))gOff=-1;
+  const segs=text.split(/[\s,，、;；]+|然后|还有|另外/g).filter(Boolean);
+  const out=[];
+  segs.forEach(raw=>{
+    const m=raw.match(/(\d+(?:\.\d+)?)/);
+    if(!m)return;
+    const amt=parseFloat(m[1]);if(!isFinite(amt)||amt<=0)return;
+    let off=gOff;
+    if(/前天/.test(raw))off=-2;else if(/昨天|昨日/.test(raw))off=-1;else if(/今天|今日/.test(raw))off=0;
+    const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+off);
+    const clean=raw.replace(/(\d+(?:\.\d+)?)/,' ').replace(/前天|昨天|昨日|今天|今日|欧元|欧|块钱|块|元|¥|€|rmb|RMB/g,'').replace(/^[\s:：\-]+|[\s:：\-]+$/g,'').trim();
+    const income=/收入|工资|薪|进账|报销|红包|奖金|结余/.test(clean);
+    const type=income?'income':'expense';
+    const note=clean||raw.replace(/(\d+(?:\.\d+)?)/,'').trim()||raw;
+    const cat=type==='income'?(clean.slice(0,6)||'收入'):qlCat(clean);
+    out.push({type:type,amount:+amt.toFixed(2),cat:cat,note:String(note).slice(0,20),date:dateKey(d)});
+  });
+  return out;
+}
+let qlPending=[];
+function renderQuickLed(){
+  const el=$('#quickLed');if(!el)return;
+  el.innerHTML='<div class="geo-top"><span class="geo-title">⚡ 一句话速记</span></div>'
+    +'<div class="ql-row"><input id="qlInput" class="ql-inp" placeholder="如：午饭12 打车8.5 咖啡3（可带“昨天”）" autocomplete="off"><button class="link-btn" id="qlParse">解析</button></div>'
+    +(qlPending.length?'<div class="ql-prev">'+qlPending.map(it=>'<div class="ql-item"><span>'+(it.type==='income'?'💶':'🛍️')+' '+esc(it.cat)+(it.note&&it.note!==it.cat?' · '+esc(it.note):'')+' <span style="opacity:.55">'+it.date+'</span></span><b>'+(it.type==='income'?'+':'-')+fmtMoney(it.amount)+'</b></div>').join('')+'<button class="btn" id="qlSave" style="margin-top:8px">保存这 '+qlPending.length+' 笔</button></div>':'');
+}
+function qlParse(){
+  const i=$('#qlInput');const txt=i?i.value.trim():'';
+  if(!txt){toast('先写点内容，如：午饭12');return}
+  qlPending=parseQuickLedger(txt);
+  if(!qlPending.length){toast('没认出金额，试试「午饭12」');return}
+  renderQuickLed();
+}
+function qlSave(){
+  if(!qlPending.length)return;
+  qlPending.forEach(it=>{ledger.push({id:uid(),type:it.type,amount:+it.amount.toFixed(2),cat:String(it.cat).slice(0,12),date:it.date,note:String(it.note||'').slice(0,40),created:Date.now(),_ut:Date.now()})});
+  saveLedger();const c=qlPending.length;qlPending=[];renderLedger();toast('已记 '+c+' 笔 ✨');
+}
+(function(){
+  const q=$('#quickLed');
+  if(q)q.addEventListener('click',e=>{
+    if(e.target.closest('#qlParse')){qlParse();return}
+    if(e.target.closest('#qlSave')){qlSave();return}
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.target&&e.target.id==='qlInput'&&e.key==='Enter'&&!e.isComposing){e.preventDefault();qlParse()}
+    if(e.target&&e.target.id==='memInput'&&e.key==='Enter'&&!e.isComposing){e.preventDefault();const mi=$('#memInput');if(mi&&mi.value.trim()){rememberFact(mi.value);mi.value='';renderMem();toast('已记住')}}
+  });
+})();
+
+/* ================= v1.33.0 AI 财务顾问 + 账单预警 ================= */
+function aiFinanceAlerts(){
+  const alerts=[];const t=todayStr();const now=dOnly(t);const m=t.slice(0,7);
+  billList().forEach(r=>{
+    const day=+(r.date||'').slice(8,10)||1;
+    let due=new Date(now.getFullYear(),now.getMonth(),day);
+    if(due<now)due=new Date(now.getFullYear(),now.getMonth()+1,day);
+    const diff=Math.round((due-now)/864e5);
+    if(diff<=3)alerts.push({ic:'🔁',text:(diff===0?'今天':diff+' 天后')+(r.cat||'订阅')+'自动扣 '+fmtMoney(r.amount),warn:diff<=1});
+  });
+  const cb=catBudgets();
+  Object.keys(cb).forEach(k=>{
+    const bud=+cb[k];if(!(bud>0))return;
+    const spent=ledger.filter(r=>r.date.startsWith(m)&&r.type==='expense'&&r.cat===k).reduce((a,b)=>a+ +b.amount,0);
+    if(spent>bud)alerts.push({ic:'🎯',text:k+' 预算超了 '+fmtMoney(spent-bud),warn:true});
+    else if(spent>=bud*0.8)alerts.push({ic:'🎯',text:k+' 预算已用 '+Math.round(spent/bud*100)+'%',warn:false});
+  });
+  const budget=+store.get('wb.budget',0)||0;
+  const monthOut=ledger.filter(r=>r.date.startsWith(m)&&r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
+  if(budget>0&&monthOut>budget)alerts.push({ic:'🛍️',text:'本月支出超总预算 '+fmtMoney(monthOut-budget),warn:true});
+  return alerts.slice(0,5);
+}
+function aiAlertRender(){
+  const el=$('#aiAlert');if(!el)return;
+  const al=aiFinanceAlerts();
+  if(!al.length){el.style.display='none';el.innerHTML='';return}
+  el.style.display='';
+  el.innerHTML='<div class="ai-alert"><div class="ai-alert-h">🔔 财务提醒</div>'
+    +al.map(a=>'<div class="ai-alert-row'+(a.warn?' warn':'')+'"><span>'+a.ic+'</span><span>'+esc(a.text)+'</span></div>').join('')
+    +'<div style="text-align:right;margin-top:8px"><button class="link-btn" data-act="ai-advisor">💡 问 AI 财务顾问</button></div></div>';
+}
+function aiAdvisor(){
+  const al=aiFinanceAlerts();const m=todayStr().slice(0,7);
+  const flow={label:'财务顾问',build:function(){
+    const monthOut=ledger.filter(r=>r.date.startsWith(m)&&r.type==='expense').reduce((a,b)=>a+ +b.amount,0);
+    const monthIn=ledger.filter(r=>r.date.startsWith(m)&&r.type==='income').reduce((a,b)=>a+ +b.amount,0);
+    const budget=+store.get('wb.budget',0)||0;
+    const bills=billList();const billTotal=bills.reduce((a,r)=>a+ +r.amount,0);
+    const cb=catBudgets();
+    const cbLines=Object.keys(cb).filter(k=>+cb[k]>0).map(k=>{const spent=ledger.filter(r=>r.date.startsWith(m)&&r.type==='expense'&&r.cat===k).reduce((a,b)=>a+ +b.amount,0);return '- '+k+'：已花 '+fmtMoney(spent)+' / 预算 '+fmtMoney(cb[k])});
+    const byCat={};ledger.filter(r=>r.date.startsWith(m)&&r.type==='expense').forEach(r=>{byCat[r.cat]=(byCat[r.cat]||0)+ +r.amount});
+    const top=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,5).map(kv=>kv[0]+' '+fmtMoney(kv[1]));
+    return ['本月收入 '+fmtMoney(monthIn)+'，支出 '+fmtMoney(monthOut)+(budget>0?'，总预算 '+fmtMoney(budget):''),
+      '支出 Top 分类：'+(top.join('、')||'无'),
+      '固定订阅 '+bills.length+' 项，每月 '+fmtMoney(billTotal)+'：'+(bills.map(b=>b.cat+' '+fmtMoney(b.amount)).join('、')||'无'),
+      cbLines.length?('分类预算：\n'+cbLines.join('\n')):'未设分类预算',
+      '存款总计 '+fmtMoney(depTotal()),
+      al.length?('当前预警：\n'+al.map(a=>'- '+a.text).join('\n')):'当前无预警'].join('\n');
+  },prompt:'你是我的私人财务顾问。基于上面的收入/支出/订阅/预算/预警数据，给出 3 条具体可执行的省钱或预算调整建议，优先针对超支项和固定订阅。语气温和直接，像懂行的朋友，控制在 200 字内，用自然段不要用列表符号。'};
+  aiSend('帮我看看这个月的钱花得怎么样，给点建议',flow);
+}
+
+/* ================= v1.33.0 AI 长期记忆（RAG） ================= */
+let aiMemory=store.get('wb.aiMemory',[])||[];
+function saveAiMemory(){store.set('wb.aiMemory',aiMemory)}
+function aiMemoryContext(){
+  if(!aiMemory.length)return '';
+  return '【长期记忆（Yichi 让你记住的稳定偏好/事实，回答时可自然引用，不要生硬罗列）】\n'+aiMemory.slice(-20).map(x=>'- '+x.text).join('\n')+'\n\n';
+}
+function rememberFact(text){
+  text=String(text||'').trim().slice(0,120);
+  if(!text)return {ok:false,summary:'要记住的内容为空'};
+  const dup=aiMemory.find(x=>x.text===text);
+  if(dup){dup.ts=Date.now();saveAiMemory();renderMem();return {ok:true,summary:'这条已经在记忆里了：'+text}}
+  aiMemory.push({id:uid(),text:text,ts:Date.now()});
+  if(aiMemory.length>60)aiMemory=aiMemory.slice(-60);
+  saveAiMemory();renderMem();
+  return {ok:true,summary:'记住了：'+text};
+}
+function forgetFact(kw){
+  kw=String(kw||'').trim();if(!kw)return {ok:false,summary:'关键词为空'};
+  const before=aiMemory.length;
+  aiMemory=aiMemory.filter(x=>String(x.text).indexOf(kw)<0);
+  saveAiMemory();renderMem();
+  const c=before-aiMemory.length;
+  return c?{ok:true,summary:'已忘记 '+c+' 条含「'+kw+'」的记忆'}:{ok:false,summary:'没有含「'+kw+'」的记忆'};
+}
+function renderMem(){
+  const L=$('#memList');if(!L)return;
+  L.innerHTML=aiMemory.length?aiMemory.slice().reverse().map(x=>'<div class="mem-row"><span class="mem-tx">'+esc(x.text)+'</span><button class="link-btn" data-memdel="'+x.id+'">删除</button></div>').join(''):'<div style="color:var(--label2);font-size:13px;padding:12px 0">还没有记忆。让我记住点什么吧，比如「我不吃香菜」「每月房租 800 欧」。</div>';
+  const c=$('#memCount');if(c)c.textContent='共 '+aiMemory.length+' 条 · 跨会话生效';
+}
+function aiOpenMem(){renderMem();openSheet('sheet-mem')}
+
+/* ================= v1.33.0 月度报告卡（含 AI 复盘） ================= */
+function renderReportCard(){
+  const R=lastReport;if(!R)return;const el=$('#reportCard');if(!el)return;
+  el.innerHTML='<div style="border-radius:18px;padding:16px 14px;background:linear-gradient(160deg,#241a35,#1a1426);border:1px solid rgba(255,111,181,.35)">'
+    +'<div style="font-size:15px;font-weight:700;color:#FF6FB5">Yichiの工作台 · 月度报告</div>'
+    +'<div style="font-size:12px;color:rgba(245,238,248,.55);margin:2px 0 10px">'+R.y+' 年 '+R.mo+' 月</div>'
+    +R.rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed rgba(255,255,255,.10);font-size:13px"><span style="color:rgba(245,238,248,.75);flex:none">'+r[0]+' '+r[1]+'</span><b style="text-align:right;color:#F5EEF8">'+esc(r[2])+'</b></div>').join('')
+    +'<div class="ai-month-review">'+(R.loading?'✍️ ':'')+esc(R.review||'')+'</div>'
+    +'<div style="font-size:11px;color:rgba(245,238,248,.45);margin-top:10px">生成于 '+todayStr()+' · 继续加油 🎀</div></div>';
+}
+async function aiMonthReview(){
+  const R=lastReport;if(!R)return;
+  const okCfg=aiCfg.mode==='direct'?!!aiCfg.key:!!aiCfg.proxyUrl;
+  if(!okCfg){R.review='（演示模式：配置 API 后这里会生成一段 AI 月度复盘）';R.loading=false;renderReportCard();return}
+  try{
+    const dataLines=R.rows.map(r=>r[1]+'：'+r[2]).join('\n');
+    const sys='你是 Yichi 的私人助理。基于下方本月数据，写一段 180-240 字的中文月度复盘：先概括这个月的整体状态，再点出值得保持的习惯与需要留意的地方（尤其是支出结构与储蓄率），最后一句给下个月的小目标。语气像贴心闺蜜，自然段，不要列表，不要出现“根据数据”。';
+    const r=await aiCallLLM([{role:'system',content:sys+'\n\n'+dataLines},{role:'user',content:'帮我做这个月的复盘'}],null);
+    aiAddUsage(r.usage);
+    R.review=(r.content||'').trim()||'（AI 没有返回内容）';
+  }catch(e){
+    wbDiag('AI','月度复盘失败：'+(e&&e.message||e));
+    R.review='⚠️ 复盘生成失败：'+(e&&e.message||e);
+  }finally{R.loading=false;renderReportCard()}
+}
+
 /* ================= 月度报告卡 ================= */
 let lastReport=null;
 function buildReport(){
@@ -3622,18 +3836,19 @@ function buildReport(){
     ['✅','任务完成',doneTasks+' 项'],
     ['✈️','旅行',tr.length?tr.map(t=>t.dest).join('、'):'没有出行']
   ];
-  lastReport={y:y,mo:mo,rows:rows};
-  $('#reportCard').innerHTML='<div style="border-radius:18px;padding:16px 14px;background:linear-gradient(160deg,#241a35,#1a1426);border:1px solid rgba(255,111,181,.35)">'
-    +'<div style="font-size:15px;font-weight:700;color:#FF6FB5">Yichiの工作台 · 月度报告</div>'
-    +'<div style="font-size:12px;color:rgba(245,238,248,.55);margin:2px 0 10px">'+y+' 年 '+mo+' 月</div>'
-    +rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed rgba(255,255,255,.10);font-size:13px"><span style="color:rgba(245,238,248,.75);flex:none">'+r[0]+' '+r[1]+'</span><b style="text-align:right;color:#F5EEF8">'+esc(r[2])+'</b></div>').join('')
-    +'<div style="font-size:11px;color:rgba(245,238,248,.45);margin-top:10px">生成于 '+todayStr()+' · 继续加油 🎀</div></div>';
+  lastReport={y:y,mo:mo,rows:rows,review:'',loading:true};
+  renderReportCard();
   openSheet('sheet-report');
+  aiMonthReview();
 }
 $('#reportBtn').onclick=buildReport;
 $('#reportSave').onclick=()=>{
   if(!lastReport)return;
-  const R=lastReport,W=750,H=160+R.rows.length*64+70;
+  const R=lastReport,W=750,review=String(R.review||'');
+  const tmpc=document.createElement('canvas').getContext('2d');tmpc.font='24px sans-serif';
+  const maxW=W-80,rlines=[];
+  review.split('\n').forEach(p=>{let cur='';for(const ch of p){const t=cur+ch;if(tmpc.measureText(t).width>maxW&&cur){rlines.push(cur);cur=ch}else cur=t}if(cur)rlines.push(cur)});
+  const H=160+R.rows.length*64+(rlines.length?56+rlines.length*34:0)+70;
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const x=cv.getContext('2d');
   x.fillStyle='#151020';x.fillRect(0,0,W,H);
@@ -3649,6 +3864,7 @@ $('#reportSave').onclick=()=>{
     x.fillText(val,W-40-tw,yy+42);
     yy+=64;
   });
+  if(rlines.length){yy+=26;x.fillStyle='rgba(255,111,181,.9)';x.font='bold 26px sans-serif';x.fillText('📝 AI 月度复盘',40,yy);x.fillStyle='rgba(245,238,248,.85)';x.font='24px sans-serif';rlines.forEach(ln=>{yy+=34;x.fillText(ln,40,yy)})}
   x.fillStyle='rgba(245,238,248,.45)';x.font='20px sans-serif';x.fillText('生成于 '+todayStr()+' · 继续加油 🎀',40,H-30);
   const a=document.createElement('a');a.download='Yichi月度报告-'+ledMonth+'.png';a.href=cv.toDataURL('image/png');
   document.body.appendChild(a);a.click();a.remove();
@@ -3949,7 +4165,7 @@ $('#searchRes').addEventListener('click',e=>{
 $('#bkExport').onclick=()=>{
   const data={app:'Yichi工作台',ver:1,exported:new Date().toISOString(),
     tasks,ledger,trips,sports,work,pantry,geoMan,rec:recData,budget:+store.get('wb.budget',0)||0,
-    deposits,depAccs,depCats,depGoal:+store.get('wb.depGoal',0)||0,shop,wish:geoWish,events,diary,aiChat,aiSessions,aiFlows:aiFlowStore};
+    deposits,depAccs,depCats,depGoal:+store.get('wb.depGoal',0)||0,shop,wish:geoWish,events,diary,aiChat,aiSessions,aiFlows:aiFlowStore,aiMemory};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -3988,6 +4204,7 @@ $('#bkFile').addEventListener('change',async e=>{
   if(Array.isArray(d.aiChat)){aiChat=d.aiChat.filter(m=>m&&typeof m.role==='string'&&typeof m.content==='string');aiChat.forEach(m=>{if(!m.sid)m.sid=AI_SID_DEFAULT});saveAiChat()}
   if(Array.isArray(d.aiSessions)&&d.aiSessions.length){aiSessions=d.aiSessions.filter(s=>s&&typeof s.id==='string');if(!aiSessions.some(s=>s.id===AI_SID_DEFAULT))aiSessions.unshift({id:AI_SID_DEFAULT,title:'对话',ts:Date.now()});if(!aiSessions.some(s=>s.id===aiCurSid))aiCurSid=AI_SID_DEFAULT;saveAiSessions()}
   if(d.aiFlows&&typeof d.aiFlows==='object'){aiFlowStore={over:(d.aiFlows.over&&typeof d.aiFlows.over==='object')?d.aiFlows.over:{},custom:Array.isArray(d.aiFlows.custom)?d.aiFlows.custom:[]};saveAiFlows()}
+  if(Array.isArray(d.aiMemory)){aiMemory=d.aiMemory.filter(x=>x&&x.id&&typeof x.text==='string');saveAiMemory()}
   renderTasks();renderLedger();renderTravel();renderSport();renderWork();renderMenu();renderDeposit();renderShop();renderEvents();renderAI();renderDiary();renderFx();renderSub();
   closeSheets();toast('导入完成 · 数据已恢复');
 });
@@ -4354,6 +4571,8 @@ function aiToolsHtml(){
   return `<div class="ai-tools">`
     +`<span class="ai-tool-btn${aiTTS?' on':''}" data-act="ai-tts" title="AI 回复后中文朗读">🔊 语音回复：${aiTTS?'开':'关'}</span>`
     +`<span class="ai-tool-btn" data-act="ai-week" title="汇总本周数据 + AI 周评，可导出图片">🗓 周报卡</span>`
+    +`<span class="ai-tool-btn" data-act="ai-advisor" title="扫描账单/预算/预警，给个性化省钱建议">💡 财务顾问</span>`
+    +`<span class="ai-tool-btn" data-act="ai-mem" title="查看/管理 AI 长期记忆">🧠 记忆</span>`
     +`</div>`;
 }
 function aiSessionsHtml(){
@@ -4376,7 +4595,7 @@ function aiInputHtml(){
 function aiAutoGrow(t){if(!t)return;t.style.height='auto';t.style.height=Math.min(120,Math.max(40,t.scrollHeight))+'px'}
 function renderAI(){
   const hero=$('#aiHero');if(hero)hero.innerHTML=aiHeroHtml();
-  aiSugRender();
+  aiSugRender();aiAlertRender();
   const flows=$('#aiFlows');if(flows)flows.innerHTML=aiFlowsHtml();
   const tools=$('#aiTools');if(tools)tools.innerHTML=aiToolsHtml();
   const sess=$('#aiSessions');if(sess)sess.innerHTML=aiSessionsHtml();
@@ -4486,7 +4705,7 @@ function aiBuildContext(userMsg){
         det.push(`心愿单：${geoWish.map(w=>w.k).join('、')||'（空）'}`);
       }
     }
-    return out+'\n【明细（可直接引用）】\n'+det.join('\n');
+    return aiMemoryContext()+out+'\n【明细（可直接引用）】\n'+det.join('\n');
   }catch(e){return ''}
 }
 
@@ -4520,7 +4739,10 @@ const AI_TOOLS=[
   {type:'function',function:{name:'log_workout',description:'记录一次运动（写入运动模块）',parameters:{type:'object',properties:{type:{type:'string',description:'运动类型，如 跑步/散步/健身/骑车/瑜伽/球类/游泳'},dur:{type:'number',description:'时长（分钟），正整数'},qty:{type:'string',description:'数量描述可选，如 5km / 30次'},date:{type:'string',description:'YYYY-MM-DD，缺省为今天'}},required:['type','dur']}}},
   {type:'function',function:{name:'add_deposit',description:'存入一笔钱到存款账户（写入存款模块）',parameters:{type:'object',properties:{amount:{type:'number',description:'金额，正数，单位欧元'},cat:{type:'string',description:'类目名，如 工资结余/理财收益/红包/兼职/预算结余/其他'},note:{type:'string',description:'备注，可选'},date:{type:'string',description:'YYYY-MM-DD，缺省为今天'},acc:{type:'string',description:'账户 id（默认 a0=我的存款），可选'}},required:['amount']}}},
   {type:'function',function:{name:'plan_trip',description:'规划一趟新旅行（写入旅行计划模块，会自动参与足迹点亮/心愿单联动）',parameters:{type:'object',properties:{dest:{type:'string',description:'目的地文本，如 建水 / 巴黎 / 京都'},start:{type:'string',description:'出发日期 YYYY-MM-DD'},end:{type:'string',description:'返程日期 YYYY-MM-DD'},note:{type:'string',description:'备注，可选'}},required:['dest','start','end']}}},
-  {type:'function',function:{name:'add_wish',description:'把一个想去的目的地加入心愿单（足迹地图上的紫虚线圈，去过后自动转正点亮）',parameters:{type:'object',properties:{place:{type:'string',description:'地名，如 成都 / 萨尔茨堡 / 巴厘岛'}},required:['place']}}}
+  {type:'function',function:{name:'add_wish',description:'把一个想去的目的地加入心愿单（足迹地图上的紫虚线圈，去过后自动转正点亮）',parameters:{type:'object',properties:{place:{type:'string',description:'地名，如 成都 / 萨尔茨堡 / 巴厘岛'}},required:['place']}}},
+  {type:'function',function:{name:'add_ledger_batch',description:'一句话批量记账：把「午饭12 打车8 咖啡3」这类自然语言一次解析成多笔账写入记账模块（前端离线解析，你只需把用户原话原样传进来）',parameters:{type:'object',properties:{text:{type:'string',description:'用户原话，含金额与可选类别/日期词，如「昨天午饭12 打车8.5」'}},required:['text']}}},
+  {type:'function',function:{name:'remember',description:'把 Yichi 让你长期记住的稳定偏好或事实写入长期记忆（跨会话生效），如口味禁忌、固定开销、重要习惯。只在用户明确表达「记住」或信息显然长期有效时调用',parameters:{type:'object',properties:{text:{type:'string',description:'要记住的一句话，简洁陈述，如「我不吃香菜」'}},required:['text']}}},
+  {type:'function',function:{name:'forget',description:'从长期记忆里删除包含某关键词的条目（用户说「忘掉/别记着」时用）',parameters:{type:'object',properties:{keyword:{type:'string',description:'要遗忘的关键词'}},required:['keyword']}}}
 ];
 function aiToolsEnabled(model){
   if(!aiCfg.write)return false;
@@ -4637,6 +4859,15 @@ function aiExecTool(name,args){
       geoWish.push({k:place,c:coord});saveWish();renderGeo();
       return{ok:true,summary:`心愿单已加入「${place}」✨ 旅行覆盖后自动点亮`};
     }
+    if(name==='add_ledger_batch'){
+      const items=parseQuickLedger(String(args.text||''));
+      if(!items.length)return{ok:false,summary:'没从这句话里解析出金额，请让用户说清楚花了多少'};
+      items.forEach(it=>{ledger.push({id:uid(),type:it.type,amount:+it.amount.toFixed(2),cat:String(it.cat).slice(0,12),date:it.date,note:String(it.note||'').slice(0,40),created:Date.now(),_ut:Date.now()})});
+      saveLedger();renderLedger();
+      return{ok:true,summary:'一句话记了 '+items.length+' 笔：'+items.map(it=>(it.type==='income'?'收':'支')+' '+it.cat+' '+fmtMoney(it.amount)).join('、')};
+    }
+    if(name==='remember')return rememberFact(args.text);
+    if(name==='forget')return forgetFact(args.keyword);
     return{ok:false,summary:'未知工具 '+name};
   }catch(e){return{ok:false,summary:String(e&&e.message||e)}}
 }
@@ -4845,7 +5076,7 @@ async function aiSend(text,flow){
         '你是 Yichi 的私人 AI 助手，性格贴心、直接、带点幽默，用中文简体回复。',
         'Yichi 是比利时布鲁塞尔长期居民，也常在杭州活动；偏好安静逛吃、人文特色旅行；单文件 HTML 工作台是他自己维护的项目。',
         '回复控制在 300 字以内，除非明确要求长文。避免列表堆砌，多用自然段。',
-        '可用工具（务必在合适场景真调用而不是口头答应）：add_ledger 记账 / add_task 加待办 / complete_task 勾完成 / add_event 加倒数日 / log_workout 记运动 / add_deposit 存钱 / plan_trip 规划旅行 / add_wish 加心愿单。写回后用一句话确认。回答数据类问题直接引用【明细】里的条目，不要编造数字。',
+        '可用工具（务必在合适场景真调用而不是口头答应）：add_ledger 记账 / add_task 加待办 / complete_task 勾完成 / add_event 加倒数日 / log_workout 记运动 / add_deposit 存钱 / plan_trip 规划旅行 / add_wish 加心愿单 / add_ledger_batch 一句话批量记账 / remember 存入长期记忆 / forget 遗忘。写回后用一句话确认。当 Yichi 说「记住…」或透露长期稳定的偏好时调用 remember；说「忘掉/别记着…」时调用 forget；一句话里含多笔开销时用 add_ledger_batch 原样传入。回答数据类问题直接引用【明细】里的条目，不要编造数字。',
         aiBuildContext(text)
       ].filter(Boolean).join('\n\n');
       const msgs=[{role:'system',content:sys}];
@@ -4970,6 +5201,10 @@ document.addEventListener('click',e=>{
     aiTTS=!aiTTS;aiSaveTTS();if(!aiTTS)aiStopSpeak();renderAI();toast(aiTTS?'语音回复已开启':'语音回复已关闭');return;
   }
   if(e.target.closest('[data-act="ai-week"]')){aiWeekReport();return}
+  if(e.target.closest('[data-act="ai-advisor"]')){aiAdvisor();return}
+  if(e.target.closest('[data-act="ai-mem"]')){aiOpenMem();return}
+  if(e.target.closest('#memAdd')){const mi=$('#memInput');if(mi&&mi.value.trim()){rememberFact(mi.value);mi.value='';renderMem();toast('已记住')}return}
+  const _md=e.target.closest('[data-memdel]');if(_md){aiMemory=aiMemory.filter(x=>x.id!==_md.dataset.memdel);saveAiMemory();renderMem();return}
   /* v1.31.0 语音输入 */
   if(e.target.closest('#aiMicBtn')){aiMicToggle();return}
   /* v1.31.0 工作流管理 */
@@ -5028,7 +5263,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.32.0';
+const WB_VER='1.33.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ---- v1.30.0 新版本提示横幅：线上 ver.json 比本地新 / SW 换控制器 时提示重启 ---- */
