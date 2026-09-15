@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#151020">
 <link rel="apple-touch-icon" href="k3-180.png?v=3">
-<link rel="manifest" href="manifest.json?v=38">
+<link rel="manifest" href="manifest.json?v=39">
 <title>Yichiの工作台</title>
 <!--
   Yichiの工作台 · 单文件版 v2（Kuromi 库洛米主题）
@@ -727,7 +727,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
       <button data-l="media">观影读书</button>
     </div>
     <div id="lifeHabit">
-      <div class="life-bar"><span class="geo-stats" id="habitStat"></span><button class="life-add" data-add="habit">＋ 新习惯</button></div>
+      <div class="life-bar"><span class="geo-stats" id="habitStat"></span><span style="display:flex;gap:8px"><button class="life-add" data-act="habit-all" style="background:none;border:1px solid var(--sep);color:var(--label2)">✓ 全打</button><button class="life-add" data-add="habit">＋ 新习惯</button></span></div>
       <div id="habitList"></div>
     </div>
     <div id="lifeHealth" style="display:none">
@@ -883,6 +883,7 @@ input,textarea{font-family:inherit;outline:none;color:var(--label)}
     </div>
     <div class="field"><label>金额（€）</label>
       <input id="ledAmount" class="amount-input" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0.00">
+      <div class="chips" id="ledAmtQuick" style="margin-top:8px"></div>
     </div>
     <div class="field"><label>类别</label><div class="chips" id="ledCats"></div></div>
     <div class="field"><label>关联旅行</label><div class="chips" id="ledTrips"></div></div>
@@ -1571,6 +1572,12 @@ $('#lifeSeg').addEventListener('click',e=>{
   $('#lifeMedia').style.display=lifeSeg==='media'?'':'none';
 });
 /* 习惯交互 */
+$$('[data-act="habit-all"]').forEach(b=>b.addEventListener('click',()=>{
+  const t=todayStr();let n=0;
+  habits.forEach(h=>{if(!habitChecked(h.id,t)){habitLog.push({id:uid(),hid:h.id,date:t,created:Date.now()});n++}});
+  if(!n){toast('今天都打过卡啦 🎉');return}
+  saveHabitLog();renderLife();toast('已打卡 '+n+' 个习惯 ✅');
+}));
 $('#habitList').addEventListener('click',e=>{
   const chk=e.target.closest('.hb-check');
   if(chk){toggleHabit(chk.dataset.hid);return}
@@ -2235,6 +2242,15 @@ $('#fabLedger').onclick=()=>{
   ledTripId='';buildLedTrips();$('#ledRecur').checked=false;
   openSheet('sheet-ledger');
 };
+/* v1.35.0 常用金额一键填（记账弹窗） */
+(function(){
+  const wrap=$('#ledAmtQuick');if(!wrap)return;
+  wrap.innerHTML=[1,5,10,20,50,100].map(v=>'<button class="chip" data-amt="'+v+'">€'+v+'</button>').join('');
+  wrap.addEventListener('click',e=>{
+    const c=e.target.closest('[data-amt]');if(!c)return;
+    const inp=$('#ledAmount');if(inp){inp.value=c.dataset.amt;try{inp.focus({preventScroll:true})}catch(err){inp.focus()}}
+  });
+})();
 /* 日期快捷：今天 / 昨天 / 前天 */
 function dateQuick(wrapSel,inputSel){
   const wrap=$(wrapSel);if(!wrap)return;
@@ -3191,7 +3207,10 @@ $('#spinGo').onclick=()=>{
 };
 
 /* ================= Sheet 通用 ================= */
-function openSheet(id){$('#sheetMask').classList.add('show');$('#'+id).classList.add('show')}
+function openSheet(id){$('#sheetMask').classList.add('show');const sh=$('#'+id);sh.classList.add('show');
+  /* v1.35.0 体验简化：弹窗打开自动聚焦空的金额/数值输入，省一次点按 */
+  setTimeout(()=>{const f=sh.querySelector('input.amount-input')||sh.querySelector('input[inputmode="decimal"]');if(f&&!f.value){try{f.focus({preventScroll:true})}catch(e){f.focus()}}},140);
+}
 function closeSheets(){$('#sheetMask').classList.remove('show');$$('.sheet').forEach(s=>s.classList.remove('show'))}
 $('#sheetMask').onclick=closeSheets;
 $$('.sheet .cancel').forEach(b=>b.onclick=closeSheets);
@@ -5668,7 +5687,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.34.0';
+const WB_VER='1.35.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ---- v1.30.0 新版本提示横幅：线上 ver.json 比本地新 / SW 换控制器 时提示重启 ---- */
