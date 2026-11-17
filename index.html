@@ -573,6 +573,31 @@ body.wb-gsap .page.active{animation:none}
 .ai-entry-go{flex:none;font-size:12px;font-weight:700;color:var(--sky)}
 @media (prefers-reduced-motion: reduce){.ai-entry:hover,.ai-entry:active{transform:none!important}}
 /* ===== v1.39.1 end ===== */
+/* ===== v1.39.1 AI 对话界面：输入框吸附底部，进入即看最新对话 ===== */
+#aiInput{position:sticky;bottom:0;z-index:30;background:var(--bg);padding-bottom:env(safe-area-inset-bottom)}
+.ai-input-bar{position:static;bottom:auto}
+/* ===== v1.40.0 AI 对话优先 + 抽屉 + 上下文压缩摘要 ===== */
+#page-ai{padding-bottom:150px}
+.ai-drawer[hidden]{display:none}
+.ai-drawer{margin-top:10px}
+.ai-drawer-in{border:1px solid var(--sep);border-radius:var(--radius);background:var(--card);padding:10px 12px 14px;animation:fadeIn .2s ease}
+.ai-composer-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0 2px}
+.ai-ct-btn{flex:none;border:1px solid var(--sep);background:rgba(255,255,255,.04);color:var(--label);border-radius:999px;padding:5px 11px;font-size:12px;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s}
+.ai-ct-btn:hover{background:rgba(255,111,181,.14);border-color:rgba(255,111,181,.5);transform:translateY(-1px)}
+.ai-ct-btn:active{transform:scale(.95)}
+.ai-ct-btn[disabled]{opacity:.45;cursor:not-allowed;transform:none}
+.ai-ct-caret{font-size:10px;opacity:.8}
+.ai-ctx-hint{font-size:11px;color:var(--label2);margin-left:auto;white-space:nowrap}
+.ai-sumcard{align-self:stretch;background:linear-gradient(135deg,rgba(255,111,181,.10),rgba(157,107,255,.10));border:1px solid rgba(255,111,181,.28);border-radius:14px;padding:10px 12px;margin:2px 0 6px}
+.ai-sum-h{font-size:12.5px;font-weight:600;color:var(--label);display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.ai-sum-meta{font-size:11px;font-weight:400;color:var(--label2)}
+.ai-sum-body{font-size:13px;line-height:1.6;color:var(--label);margin-top:6px;white-space:pre-wrap;word-break:break-word}
+.ai-sum-early{margin-top:8px}
+.ai-sum-early summary{cursor:pointer;font-size:11.5px;color:var(--label2);list-style:none;user-select:none}
+.ai-sum-early summary::-webkit-details-marker{display:none}
+.ai-sum-early summary::before{content:'\25B8\00a0'}
+.ai-sum-early[open] summary::before{content:'\25BE\00a0'}
+.ai-msgs-early{opacity:.72;margin-top:8px;padding-top:8px;border-top:1px dashed var(--sep)}
 </style>
 </head>
 <body>
@@ -779,17 +804,22 @@ body.wb-gsap .page.active{animation:none}
   <!-- ========== AI 助手（v1.26.0） ========== -->
   <section class="page" id="page-ai">
     <div id="aiHero"></div>
-    <div id="aiSug" style="margin-top:10px"></div>
-    <div id="aiQuick"></div>
-    <div id="aiAlert" style="margin-top:10px"></div>
-    <div id="aiFlows" style="margin-top:12px"></div>
-    <div id="aiTools" style="margin-top:10px"></div>
-    <div id="aiSessions" style="margin-top:12px"></div>
-    <div class="geo-region" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+    <div class="geo-region" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
       <span>对话</span>
       <span class="geo-stats" id="aiStats"></span>
     </div>
     <div id="aiChat"></div>
+    <!-- v1.40.0 对话优先：辅助面板收进默认收起的抽屉（不删功能，id 与渲染函数不变） -->
+    <div id="aiDrawer" class="ai-drawer" hidden>
+      <div class="ai-drawer-in">
+        <div id="aiSug"></div>
+        <div id="aiQuick"></div>
+        <div id="aiAlert" style="margin-top:10px"></div>
+        <div id="aiFlows" style="margin-top:12px"></div>
+        <div id="aiTools" style="margin-top:10px"></div>
+        <div id="aiSessions" style="margin-top:12px"></div>
+      </div>
+    </div>
     <div id="aiInput"></div>
   </section>
   <!-- ========== 日记（v1.32.0） ========== -->
@@ -4812,7 +4842,9 @@ $('#bkFile').addEventListener('change',async e=>{
 });
 
 /* ================= AI 助手模块（v1.26.0） ================= */
-let aiChat=store.get('wb.aiChat',[]);          /* [{id,role,content,ts,flow,model,err,thinking,sid}] */
+let aiChat=store.get('wb.aiChat',[])
+var aiSummaries=store.get('wb.aiSummaries',null);if(!aiSummaries||typeof aiSummaries!=='object'||Array.isArray(aiSummaries))aiSummaries={};
+function saveAiSummaries(){try{store.set('wb.aiSummaries',aiSummaries)}catch(e){}};          /* [{id,role,content,ts,flow,model,err,thinking,sid}] */
 const saveAiChat=()=>store.set('wb.aiChat',aiChat);
 if(!Array.isArray(aiChat))aiChat=[];
 aiChat=aiChat.filter(m=>m&&typeof m.role==='string'&&typeof m.content==='string');
@@ -5209,18 +5241,75 @@ function aiSessionsHtml(){
 }
 function aiChatHtml(){
   const msgs=aiCurMsgs();
-  if(!msgs.length)return `<div class="ai-empty"><div class="kuromi">🪄</div>还没有对话，试试上面的快捷工作流<br>或直接输入你的问题</div>`;
+  if(!msgs.length)return `<div class="ai-empty"><div class="kuromi">🪄</div>还没有对话，点输入框上方的 <b>🗂 面板</b> 看快捷提问与工作流<br>或直接输入你的问题</div>`;
+  const sum=aiSummaries[aiCurSid];
+  if(sum&&sum.text){
+    const sumTs=sum.ts||0;
+    const early=msgs.filter(m=>(m.ts||0)<sumTs);
+    const recent=msgs.filter(m=>(m.ts||0)>=sumTs);
+    const card='<div class="ai-sumcard">'
+      +'<div class="ai-sum-h">🗜️ 上下文摘要<span class="ai-sum-meta">已压缩 '+early.length+' 条早期对话以节省 token</span></div>'
+      +'<div class="ai-sum-body">'+esc(sum.text)+'</div>'
+      +(early.length?'<details class="ai-sum-early"><summary>展开早期对话（'+early.length+' 条）</summary><div class="ai-msgs ai-msgs-early">'+early.slice(-60).map(aiMsgHtml).join('')+'</div></details>':'')
+      +'</div>';
+    return `<div class="ai-msgs">${card}${recent.map(aiMsgHtml).join('')}</div>`;
+  }
   return `<div class="ai-msgs">${msgs.slice(-40).map(aiMsgHtml).join('')}</div>`;
+}
+async function aiCompressContext(){
+  if(aiBusy){toast('正在处理中，请稍候');return}
+  const sid=aiCurSid;
+  const all=aiCurMsgs().filter(m=>!m.thinking&&!m.err&&m.model!=='demo'&&m.content);
+  const prev=(aiSummaries[sid]&&aiSummaries[sid].text)||'';
+  const sumTs=(aiSummaries[sid]&&aiSummaries[sid].ts)||0;
+  const uncovered=all.filter(m=>(m.ts||0)>=sumTs);
+  if(!uncovered.length){toast('没有可压缩的新对话');return}
+  if(uncovered.length<4&&!prev){toast('对话还太短，暂时不需要压缩');return}
+  const okCfg=aiCfg.mode==='direct'?!!aiCfg.key:!!aiCfg.proxyUrl;
+  if(!okCfg){toast('压缩摘要需要接入真实模型（当前为演示模式）');return}
+  aiBusy=true;renderAI();
+  try{
+    const convo=(prev?'【已有摘要，请与之合并去重】\n'+prev+'\n\n':'')+'【待压缩对话】\n'+uncovered.map(m=>(m.role==='user'?'用户':'助手')+'：'+m.content).join('\n');
+    const sys='你是对话压缩器。把给定对话浓缩成简洁中文要点摘要，务必保留：关键事实、数字、日期、金额、用户偏好、已做出的决定、待办与未完成事项。不要遗漏任何可执行信息，不要添加对话中没有的内容，不要寒暄。输出纯要点，控制在 200 字以内。';
+    const res=await aiCallLLM([{role:'system',content:sys},{role:'user',content:convo}],null,{});
+    const text=((res&&res.content)||'').trim();
+    if(!text)throw new Error('模型未返回摘要');
+    const lastTs=uncovered.reduce((a,m)=>Math.max(a,m.ts||0),sumTs);
+    const carried=(aiSummaries[sid]&&aiSummaries[sid].n)||0;
+    aiSummaries[sid]={text:text,ts:lastTs+1,n:carried+uncovered.length,upd:Date.now()};
+    saveAiSummaries();
+    toast('已压缩上下文：'+uncovered.length+' 条早期对话已折叠为摘要');
+  }catch(e){
+    toast('压缩失败：'+(e&&e.message||e));
+  }finally{
+    aiBusy=false;renderAI();
+  }
 }
 function aiInputHtml(){
   const mic=aiMicSupported()?`<button class="ai-mic-btn" id="aiMicBtn" aria-label="语音输入">🎙</button>`:'';
-  return `<div class="ai-input-bar">
+  const dr=$('#aiDrawer');const drOpen=!!(dr&&!dr.hidden);
+  const sum=aiSummaries[aiCurSid];const sumTs=(sum&&sum.ts)||0;
+  const all=aiCurMsgs().filter(m=>!m.thinking&&!m.err&&m.model!=='demo');
+  const active=all.filter(m=>(m.ts||0)>=sumTs).length;
+  const hint=all.length?`上下文 ${active} 条${sum&&sum.text?' +摘要':''}`:'';
+  const cLbl=sum&&sum.text?'🗜️ 再压缩':'🗜️ 压缩上下文';
+  return `<div class="ai-composer-tools">
+    <button class="ai-ct-btn" data-act="ai-drawer" id="aiDrawerBtn" aria-expanded="${drOpen?'true':'false'}">🗂 面板 <span class="ai-ct-caret">${drOpen?'▴':'▾'}</span></button>
+    <button class="ai-ct-btn" data-act="ai-sess-new">＋ 新对话</button>
+    <button class="ai-ct-btn" data-act="ai-compress"${aiBusy?' disabled':''} title="把早期对话总结成摘要以节省上下文">${cLbl}</button>
+    <span class="ai-ctx-hint">${hint}</span>
+  </div>
+  <div class="ai-input-bar">
     ${mic}
     <textarea id="aiInputBox" placeholder="问我任何事…（Enter 发送）" rows="1"></textarea>
     ${aiBusy?'<button class="ai-send-btn stop" id="aiStopBtn" aria-label="停止生成">⏹</button>':'<button class="ai-send-btn" id="aiSendBtn" aria-label="发送">➤</button>'}
   </div>`;
 }
 function aiAutoGrow(t){if(!t)return;t.style.height='auto';t.style.height=Math.min(120,Math.max(40,t.scrollHeight))+'px'}
+var aiForceScroll=false,aiLastMsgN=-1;
+function aiDocH(){try{return Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)}catch(e){return 0}}
+function aiNearBottom(){try{return (window.innerHeight+(window.scrollY||window.pageYOffset||0))>=(aiDocH()-160)}catch(e){return true}}
+function aiScrollBottom(){try{window.scrollTo(0,aiDocH())}catch(e){}}
 function renderAI(){
   const hero=$('#aiHero');if(hero)hero.innerHTML=aiHeroHtml();
   aiSugRender();aiAlertRender();aiQuickRender();
@@ -5245,6 +5334,13 @@ function renderAI(){
   const st=$('#aiStats');
   const _cn=aiCurMsgs().length;
   if(st)st.textContent=_cn?`${_cn} 条`:'';
+  /* v1.39.1 对话视图：内容变化或用户在底部时，自动锚定到最新消息 */
+  try{
+    if(typeof curTab!=='undefined'&&curTab==='ai'){
+      if(aiForceScroll||_cn!==aiLastMsgN||aiNearBottom())aiScrollBottom();
+    }
+    aiLastMsgN=_cn;aiForceScroll=false;
+  }catch(e){}
 }
 
 function aiBuildContext(userMsg){
@@ -6006,7 +6102,7 @@ function aiLiveUpdate(botId,txt){
 async function aiSend(text,flow){
   text=(text||'').trim();
   if(!text||aiBusy)return;
-  aiBusy=true;renderAI();
+  aiBusy=true;aiForceScroll=true;renderAI();
   const userMsg={id:uid(),role:'user',content:text,ts:Date.now(),flow:flow?flow.label:'',sid:aiCurSid};
   aiChat.push(userMsg);saveAiChat();
   const _sess=aiSessions.find(s=>s.id===aiCurSid);
@@ -6037,7 +6133,9 @@ async function aiSend(text,flow){
         let fdata='';try{fdata=flow.build()}catch(e){fdata='（数据构建失败：'+(e&&e.message||e)+'）'}
         msgs.push({role:'system',content:`【工作流】${flow.label}\n【数据】\n${fdata}\n【指令】${flow.prompt}`});
       }
-      aiCurMsgs().filter(m=>m.id!==botId&&!m.thinking&&!m.err&&m.model!=='demo').slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
+      const _csum=aiSummaries[aiCurSid];const _csumTs=(_csum&&_csum.ts)||0;
+      if(_csum&&_csum.text)msgs.push({role:'system',content:'【之前的对话摘要（已压缩，供你理解上下文，勿重复询问其中已明确的信息）】\n'+_csum.text});
+      aiCurMsgs().filter(m=>m.id!==botId&&!m.thinking&&!m.err&&m.model!=='demo'&&(m.ts||0)>=_csumTs).slice(-12).forEach(m=>msgs.push({role:m.role==='user'?'user':'assistant',content:m.content}));
       let res=await aiCallLLM(msgs,aiToolsFor(aiCfg.model||aiProv().defModel),{onDelta:t=>aiLiveUpdate(botId,t)});
       aiAddUsage(res.usage);
       const doneTools=[];
@@ -6160,6 +6258,12 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="ai-week"]')){aiWeekReport();return}
   if(e.target.closest('[data-act="ai-advisor"]')){aiAdvisor();return}
   if(e.target.closest('[data-act="ai-mem"]')){aiOpenMem();return}
+  if(e.target.closest('[data-act="ai-drawer"]')){
+    const d=$('#aiDrawer');
+    if(d){d.hidden=!d.hidden;const open=!d.hidden;const b=$('#aiDrawerBtn');if(b){b.setAttribute('aria-expanded',open?'true':'false');const c=b.querySelector('.ai-ct-caret');if(c)c.textContent=open?'▴':'▾'}if(open){try{d.scrollIntoView({block:'nearest'})}catch(e){}}}
+    return;
+  }
+  if(e.target.closest('[data-act="ai-compress"]')){aiCompressContext();return}
   const qk=e.target.closest('[data-act="ai-quick"]');
   if(qk){const q=qk.dataset.q;if(q)aiSend(q);return}
   const jb=e.target.closest('[data-act="ai-jump"]');
@@ -6239,7 +6343,7 @@ document.addEventListener('input',e=>{
 });
 
 /* ================= 版本号（发版时同步更新 web-deploy/manifest.json 的 version） ================= */
-const WB_VER='1.39.0';
+const WB_VER='1.40.0';
 $('#verLine').textContent='Yichiの工作台 · v'+WB_VER;
 
 /* ---- v1.30.0 新版本提示横幅：线上 ver.json 比本地新 / SW 换控制器 时提示重启 ---- */
@@ -6498,6 +6602,16 @@ setInterval(()=>wbCheckVersion(true),1800000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
 /* ===== UI 动效控制器 end ===== */
+
+/* v1.39.1 进入 AI 页时落到最新对话（覆盖 switchTab 内的 scrollTo(0,0)） */
+document.addEventListener('wb:tabchange',function(ev){
+  try{
+    if(ev&&ev.detail&&ev.detail.tab==='ai'){
+      aiForceScroll=true;
+      setTimeout(function(){aiScrollBottom();try{var b=document.getElementById('aiInputBox');if(b)aiAutoGrow(b)}catch(e){}},0);
+    }
+  }catch(e){}
+});
 </script>
 </body>
 </html>
